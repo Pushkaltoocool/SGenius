@@ -10,6 +10,7 @@
     --accent-hover: #0056b3;
     --error-color: #e53935;
     --success-color: #43a047;
+    --warning-color: #fdd835;
     --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
@@ -167,7 +168,7 @@ input, select, button {
 .auth-container p { color: var(--secondary-text); margin-bottom: 30px; }
 .auth-form .input-group, #personalization-form .input-group, .modal-content .input-group { margin-bottom: 20px; text-align: left; }
 .auth-form label, #personalization-form label, .modal-content label { display: block; margin-bottom: 8px; color: var(--secondary-text); font-size: 0.9rem; }
-.auth-form input, #personalization-form input, #personalization-form select, .modal-content input {
+.auth-form input, #personalization-form input, #personalization-form select, .modal-content input, .modal-content select {
     width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);
     background-color: var(--primary-bg); color: var(--primary-text); font-size: 1rem; box-sizing: border-box;
 }
@@ -218,14 +219,14 @@ header {
     background-color: var(--card-bg); border-bottom: 1px solid var(--border-color); flex-shrink: 0;
     backdrop-filter: blur(15px);
 }
-header nav { display: flex; gap: 25px; }
+header nav { display: flex; gap: 20px; flex-wrap: wrap; }
 header nav a { color: var(--secondary-text); text-decoration: none; font-weight: bold; transition: color 0.3s ease; padding: 5px 0; }
 header nav a.active { color: var(--accent-color); border-bottom: 2px solid var(--accent-color); }
 header .user-info { display: flex; align-items: center; gap: 15px; }
 
 #persistent-timer-display { display: flex; align-items: center; gap: 10px; background-color: var(--primary-bg); padding: 5px 12px; border-radius: 6px; }
 #persistent-timer-display .timer-label { font-size: 0.9rem; color: var(--secondary-text); }
-#header-timer-text { font-weight: bold; color: var(--accent-color); }
+#header-timer-text { font-weight: bold; color: var(--accent-color); font-family: monospace; font-size: 1.1rem;}
 
 #logout-btn {
     background: none; border: 1px solid var(--border-color); color: var(--secondary-text); padding: 8px 15px;
@@ -256,13 +257,19 @@ main::-webkit-scrollbar-thumb:hover { background: #555; }
 .content-box h3 { margin-top: 25px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
 
 /* --- Dashboard Widgets --- */
-.timer-display { font-size: 5rem; font-weight: bold; text-align: center; color: var(--primary-text); margin: auto 0; }
-.timer-controls { text-align: center; }
-.timer-controls button {
-    padding: 12px 25px; font-size: 1rem; border-radius: 8px; border: 1px solid var(--accent-color);
-    background-color: transparent; color: var(--accent-color); cursor: pointer; transition: all 0.3s ease; margin: 0 5px;
+.timer-display { font-size: 4rem; font-weight: bold; text-align: center; color: var(--primary-text); margin: 20px 0; font-family: monospace;}
+.timer-widget { text-align: center; }
+.timer-widget .input-group { margin: 20px auto; max-width: 300px; text-align: left; }
+.timer-widget select {
+    width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);
+    background-color: var(--primary-bg); color: var(--primary-text); font-size: 1rem;
 }
-.timer-controls button:hover { background-color: var(--accent-color); color: white; }
+.timer-controls { text-align: center; display: flex; justify-content: center; gap: 10px; margin-top: 15px;}
+.timer-controls button {
+    padding: 12px 25px; font-size: 1rem; border-radius: 8px; border: none;
+    cursor: pointer; transition: all 0.3s ease;
+}
+
 .ai-assistant { display: flex; flex-direction: column; overflow: hidden; }
 .chat-window {
     flex-grow: 1; background-color: var(--primary-bg); border-radius: 8px; padding: 20px;
@@ -308,12 +315,14 @@ main::-webkit-scrollbar-thumb:hover { background: #555; }
 .modal-actions { margin-top: 30px; display: flex; justify-content: flex-end; gap: 15px; }
 
 
-/* --- Classroom & Logbook Styles --- */
+/* --- Classroom, Logbook, Leaderboard Styles --- */
 .content-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 15px;
 }
 .join-form { display: flex; gap: 10px; }
 .join-form input { background-color: var(--primary-bg); border: 1px solid var(--border-color); color: var(--primary-text); padding: 10px; border-radius: 6px;}
@@ -321,16 +330,17 @@ main::-webkit-scrollbar-thumb:hover { background: #555; }
 
 ul.item-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
 .list-item {
-    background-color: var(--secondary-bg); padding: 15px 20px; border-radius: 8px;
+    background-color: var(--primary-bg); padding: 15px 20px; border-radius: 8px;
     border-left: 4px solid var(--accent-color); transition: background-color 0.2s ease;
+    display: flex; justify-content: space-between; align-items: center;
 }
 .list-item a { text-decoration: none; color: var(--primary-text); }
 a.list-item-link { text-decoration: none; }
-.list-item:hover { background-color: #3a3f44; }
+.list-item:hover { background-color: #2c2c2c; }
 .list-item strong { font-size: 1.1rem; color: var(--primary-text); }
 .list-item .meta { font-size: 0.9rem; color: var(--secondary-text); }
-.material-item a { font-size: 1.1rem; text-decoration: none; color: var(--accent-color);}
-.material-item a:hover { text-decoration: underline; }
+.assignment-item a { font-size: 1.1rem; text-decoration: none; color: var(--accent-color);}
+.assignment-item a:hover { text-decoration: underline; }
 
 .back-link { color: var(--secondary-text); text-decoration: none; display: inline-block; margin-bottom: 15px;}
 .back-link:hover { color: var(--primary-text); }
@@ -350,3 +360,30 @@ a.list-item-link { text-decoration: none; }
 }
 .role-display.teacher { background-color: var(--accent-color); color: white; }
 .role-display.student { background-color: var(--success-color); color: white; }
+
+/* Assignment Detail & Submission Styles */
+.assignment-worksheet { max-width: 100%; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 20px; }
+.submission-card { background-color: var(--primary-bg); padding: 20px; border-radius: 8px; margin-top: 15px; }
+.submission-card h4 { margin-top: 0; }
+.submission-image { max-width: 200px; height: auto; border-radius: 8px; cursor: pointer; transition: transform 0.2s; }
+.submission-image:hover { transform: scale(1.5); }
+.feedback-box { background-color: var(--secondary-bg); border-left: 3px solid var(--accent-color); padding: 15px; margin-top: 10px; border-radius: 4px; }
+.status-badge { padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; color: white; }
+.status-graded { background-color: var(--success-color); }
+.status-submitted { background-color: var(--warning-color); color: #121212;}
+.status-viewed { background-color: var(--secondary-text); }
+
+.grading-form { display: flex; gap: 10px; align-items: center; margin-top: 10px; }
+.grading-form input { flex-grow: 1; }
+
+/* Leaderboard Styles */
+.leaderboard-tabs { display: flex; gap: 10px; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; }
+.leaderboard-tabs button {
+    background: none; border: none; color: var(--secondary-text); padding: 10px 20px; cursor: pointer;
+    border-bottom: 3px solid transparent; transition: all 0.2s; font-size: 1rem;
+}
+.leaderboard-tabs button.active { color: var(--accent-color); border-bottom-color: var(--accent-color); }
+.rank-list .list-item { padding-left: 15px; }
+.rank-list .rank { font-size: 1.2rem; font-weight: bold; color: var(--accent-color); width: 40px; text-align: center; }
+.rank-list .user-info { flex-grow: 1; margin-left: 20px; }
+.rank-list .time { font-size: 1.1rem; font-weight: 500; }

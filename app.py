@@ -10,56 +10,60 @@ CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 @app.route('/')
 def index():
-    return "SGenius AI Tutor Backend is running."
+    return "SGenius AI Feedback Backend is running."
 
-@app.route('/api/ask', methods=['POST'])
-def ask_sgenius():
+@app.route('/api/feedback', methods=['POST'])
+def generate_feedback():
     """
-    Main API endpoint for the AI tutor.
-    Receives a question and an optional image URL.
+    API endpoint to generate personalized feedback for a student's submission.
+    Receives a subject and a grade.
     """
     data = request.get_json()
     if not data:
         return jsonify({"error": "Invalid JSON input"}), 400
 
-    question = data.get('question', '').lower()
-    image_url = data.get('image_url')
+    subject = data.get('subject', 'General').lower()
+    grade_str = data.get('grade', 'N/A').lower()
 
-    if not question:
-        return jsonify({"error": "Question field is required"}), 400
+    if not subject or not grade_str:
+        return jsonify({"error": "Subject and grade fields are required"}), 400
 
-    # --- Simulated AI Logic based on Keywords ---
-    # This is where you would integrate a real AI/LLM model
+    # --- AI Logic for Personalized Feedback ---
+    # This simulates an AI analyzing the grade and subject to give feedback.
     
-    response_text = ""
+    feedback_text = ""
 
-    if image_url:
-        response_text += f"I see the image you sent from {image_url}. "
-
-    if "psle" in question or "primary school" in question:
-        if "photosynthesis" in question:
-            response_text += "For PSLE Science, photosynthesis is the process where plants use sunlight, water, and carbon dioxide to create their own food (glucose) and release oxygen. It mainly happens in the chloroplasts within leaf cells."
+    # Try to extract a numeric score if possible
+    numeric_grade = -1
+    try:
+        if '/' in grade_str:
+            parts = grade_str.split('/')
+            numeric_grade = (int(parts[0]) / int(parts[1])) * 100
+        elif '%' in grade_str:
+            numeric_grade = int(grade_str.replace('%', '').strip())
         else:
-            response_text += "For Primary School questions, it's important to use simple terms. Could you be more specific about the topic?"
-    
-    elif "o-level" in question or "sec 3" in question or "chemistry" in question:
-        if "mitosis" in question and "meiosis" in question:
-            response_text += "Great O-Level Biology question! The key difference is that Mitosis produces two identical daughter cells for growth and repair, keeping the chromosome number the same. Meiosis, however, produces four genetically different gametes (sex cells) with half the number of chromosomes, essential for sexual reproduction."
-        elif "mole concept" in question:
-             response_text += "For O-Level Chemistry, the Mole is a unit for amount of substance. One mole of any substance contains Avogadro's constant (6.02 x 10^23) of particles. The mass of one mole is its relative atomic or molecular mass in grams."
-        else:
-            response_text += "For Secondary School / O-Level, a strong foundation is key. Which subject are you asking about? Chemistry, Physics, Biology?"
+            # Handle qualitative grades
+            if 'a' in grade_str or 'excellent' in grade_str: numeric_grade = 95
+            elif 'b' in grade_str or 'good' in grade_str: numeric_grade = 85
+            elif 'c' in grade_str or 'satisfactory' in grade_str: numeric_grade = 75
+            elif 'd' in grade_str or 'pass' in grade_str: numeric_grade = 65
+            else: numeric_grade = 50
+    except (ValueError, ZeroDivisionError):
+        numeric_grade = -1 # Could not parse grade
 
-    elif "a-level" in question or "jc" in question or "gp" in question:
-        if "essay" in question and "technology" in question:
-            response_text += "For an A-Level General Paper essay on technology, a balanced structure is crucial. Start with a clear thesis. Argue both the benefits (e.g., connectivity, medical advances) and drawbacks (e.g., social alienation, privacy concerns). Use specific, recent examples and conclude by synthesizing your points to reaffirm your stand."
-        else:
-            response_text += "A-Level topics require depth and critical thinking. Please specify the subject (e.g., GP, Economics, Physics) and topic for a detailed explanation."
-
+    # Generate feedback based on score
+    if numeric_grade >= 90:
+        feedback_text = f"Outstanding work on this {subject} assignment! Your understanding of the topic is excellent. Keep up the great momentum."
+    elif numeric_grade >= 75:
+        feedback_text = f"Good job on this {subject} task. You have a solid grasp of the core concepts. To improve further, perhaps review the section on [key topic] to solidify your knowledge."
+    elif numeric_grade >= 60:
+        feedback_text = f"This is a satisfactory result for the {subject} assignment. You understand the basics, but there are some areas for improvement. I recommend spending more time on practice questions to build confidence."
+    elif numeric_grade >= 0:
+        feedback_text = f"It looks like this {subject} topic was challenging. Don't be discouraged! Let's review the fundamentals together. I suggest starting with [foundational concept] and watching some tutorial videos on the subject."
     else:
-        response_text += f"As a simulated AI for the Singapore curriculum, I need more context. Your question was: '{data.get('question')}' Please mention the education level (PSLE, O-Level, A-Level) or subject for a more accurate answer."
+        feedback_text = f"Thank you for your submission on {subject}. The grade was '{data.get('grade')}'. Please review the core materials and let me know if you have specific questions."
 
-    return jsonify({"response": response_text})
+    return jsonify({"feedback": feedback_text})
 
 if __name__ == '__main__':
     # Use Gunicorn's port if available, otherwise default to 8080

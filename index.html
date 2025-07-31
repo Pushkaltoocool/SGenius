@@ -3,67 +3,192 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>SGenius - Your AI Study Partner</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    
-</body>
-</html>
 
-<!-- Main container for the Single Page Application (SPA) -->
-
-
-<div id="app-container">
-
-    <!-- LOGIN PAGE (Visible by default until authenticated) -->
-    <div id="login-page" class="page">
-        <div class="auth-container">
-            <h1>S<span class="accent">Genius</span></h1>
-            <p>Your AI-Powered Study Companion</p>
-            <form id="login-form" class="auth-form">
-                <div class="input-group"><label for="login-email">Email</label><input type="email" id="login-email" required></div>
-                <div class="input-group"><label for="login-password">Password</label><input type="password" id="login-password" required></div>
-                <button type="submit" class="btn">Login</button>
-            </form>
-            <form id="signup-form" class="auth-form" style="display: none;">
-                <div class="input-group"><label for="signup-name">Display Name</label><input type="text" id="signup-name" required></div>
-                <div class="input-group"><label for="signup-email">Email</label><input type="email" id="signup-email" required></div>
-                <div class="input-group"><label for="signup-password">Password (min. 6 characters)</label><input type="password" id="signup-password" required></div>
-                <button type="submit" class="btn">Create Account</button>
-            </form>
-            <p id="error-message" class="error-message"></p>
-            <p class="auth-switch">
-                <span id="login-switch-text">Don't have an account? <a href="#" id="switch-to-signup">Sign Up</a></span>
-                <span id="signup-switch-text" style="display: none;">Already have an account? <a href="#" id="switch-to-login">Login</a></span>
-            </p>
-        </div>
-    </div>
-
-    <!-- MAIN APP SHELL (Header, Nav, and Content Area) - Hidden by default -->
-    <div id="main-app" class="page" style="display: none;">
-         <div class="dashboard-container">
-            <header>
-                <div class="logo">S<span class="accent">Genius</span></div>
+    <!-- LANDING PAGE (Initially Visible) -->
+    <div id="landing-page-container">
+        <header class="landing-header">
+            <div class="container">
                 <nav>
-                    <a href="#dashboard" class="nav-link">Dashboard</a>
-                    <a href="#classrooms" class="nav-link">Classrooms</a>
-                    <a href="#groups" class="nav-link">Groups</a>
-                    <a href="#logbook" class="nav-link">Logbook</a>
-                    <a href="#profile" class="nav-link">Profile</a>
+                    <div class="logo">S<span class="accent">Genius</span></div>
+                    <a href="#" class="nav-button" id="get-started-btn">Login / Sign Up</a>
                 </nav>
-                <div class="user-info">
-                    <span id="user-display-name">Loading...</span>
-                    <button id="logout-btn">Logout</button>
+            </div>
+        </header>
+
+        <main class="landing-main">
+            <section id="hero">
+                <div class="container">
+                    <div class="hero-content">
+                        <div class="hero-text">
+                            <h1>Learn Better,<br>Learn Smarter</h1>
+                            <a href="#" class="cta-button" id="cta-button">Get Started - It's Free</a>
+                            <p class="sub-text">Join thousands of students turning study hours into better grades.</p>
+                        </div>
+                    </div>
                 </div>
-            </header>
-            <!-- The content for each page will be dynamically injected here by script.js -->
-            <main id="main-content"></main>
+            </section>
+            <section id="features">
+                <div class="container">
+                    <h2>Everything You Need to Excel</h2>
+                    <div class="features-grid">
+                        <div class="feature-card">
+                            <h3>AI Study Assistant</h3>
+                            <p>Get instant, curriculum-aware answers for PSLE, O-Level, and A-Level subjects. Just ask.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3>Focus Timer & Logbook</h3>
+                            <p>Use the Pomodoro timer to stay focused. Every session is automatically saved to your logbook.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3>Collaborative Classrooms</h3>
+                            <p>Teachers can create virtual classrooms, share materials, and connect with their students seamlessly.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- MAIN APP SHELL (Hidden by default) -->
+    <div id="app-container" style="display: none;">
+        <!-- LOGIN MODAL (Toggled by JS) -->
+        <div id="login-page" class="page" style="display: none;">
+            <div class="auth-container">
+                <h1>S<span class="accent">Genius</span></h1>
+                <p>Your AI-Powered Study Companion</p>
+                <!-- Login Form -->
+                <form id="login-form" class="auth-form">
+                    <div class="input-group"><label for="login-email">Email</label><input type="email" id="login-email" required></div>
+                    <div class="input-group"><label for="login-password">Password</label><input type="password" id="login-password" required></div>
+                    <button type="submit" class="btn">Login</button>
+                </form>
+                <!-- Signup Form -->
+                <form id="signup-form" class="auth-form" style="display: none;">
+                    <div class="input-group"><label for="signup-name">Display Name</label><input type="text" id="signup-name" required></div>
+                    <div class="input-group"><label for="signup-email">Email</label><input type="email" id="signup-email" required></div>
+                    <div class="input-group"><label for="signup-password">Password (min. 6 characters)</label><input type="password" id="signup-password" minlength="6" required></div>
+                    <div class="role-selector">
+                        <label>I am a:</label>
+                        <div class="role-options">
+                            <input type="radio" id="role-student" name="role" value="student" checked>
+                            <label for="role-student">Student</label>
+                            <input type="radio" id="role-teacher" name="role" value="teacher">
+                            <label for="role-teacher">Teacher</label>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn">Create Account</button>
+                </form>
+                <p id="error-message" class="error-message"></p>
+                <p class="auth-switch">
+                    <span id="login-switch-text">Don't have an account? <a href="#" id="switch-to-signup">Sign Up</a></span>
+                    <span id="signup-switch-text" style="display: none;">Already have an account? <a href="#" id="switch-to-login">Login</a></span>
+                </p>
+            </div>
+        </div>
+
+        <!-- PERSONALIZATION MODAL (Toggled by JS after signup) -->
+        <div id="personalization-modal" class="page" style="display: none;">
+            <div class="auth-container">
+                <h1>Welcome to S<span class="accent">Genius</span>!</h1>
+                <p>Let's personalize your experience.</p>
+                <form id="personalization-form">
+                    <!-- Student Options -->
+                    <div id="student-options">
+                        <div class="input-group">
+                            <label for="student-level">Education Level</label>
+                            <select id="student-level" required>
+                                <option value="primary">Primary</option>
+                                <option value="secondary" selected>Secondary (O-Level)</option>
+                                <option value="jc">Junior College (A-Level)</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="student-subjects">Your Subjects (comma-separated)</label>
+                            <input type="text" id="student-subjects" placeholder="e.g., Physics, Chemistry, Math" required>
+                        </div>
+                    </div>
+                    <!-- Teacher Options -->
+                    <div id="teacher-options" style="display:none;">
+                         <div class="input-group">
+                            <label for="teacher-school">Your School/Institution</label>
+                            <input type="text" id="teacher-school" placeholder="e.g., Raffles Institution" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="teacher-subjects">Subjects You Teach (comma-separated)</label>
+                            <input type="text" id="teacher-subjects" placeholder="e.g., General Paper, Economics" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn">Complete Setup</button>
+                </form>
+            </div>
+        </div>
+
+
+        <!-- MAIN APP DASHBOARD (Hidden by default) -->
+        <div id="main-app" class="page" style="display: none;">
+             <div class="dashboard-container">
+                <header>
+                    <div class="logo">S<span class="accent">Genius</span></div>
+                    <nav>
+                        <a href="#dashboard" class="nav-link active">Dashboard</a>
+                        <a href="#classrooms" class="nav-link">Classrooms</a>
+                        <a href="#logbook" class="nav-link">Logbook</a>
+                        <a href="#profile" class="nav-link">Profile</a>
+                    </nav>
+                    <div class="user-info">
+                        <div id="persistent-timer-display" style="display: none;">
+                            <span class="timer-label">Focus:</span>
+                            <span id="header-timer-text">25:00</span>
+                        </div>
+                        <span id="user-display-name">Loading...</span>
+                        <button id="logout-btn">Logout</button>
+                    </div>
+                </header>
+                <main id="main-content"></main>
+            </div>
         </div>
     </div>
-</div>
+    
+    <!-- MODALS (e.g. for creating classroom) -->
+    <div id="modal-backdrop" class="modal-backdrop" style="display: none;">
+        <div class="modal-content" id="modal-content">
+            <!-- Modal content will be injected here by JS -->
+        </div>
+    </div>
 
-<!-- Your Consolidated Script - Type="module" is crucial -->
-<script src="script.js" type="module"></script>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
+      import { getAuth } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+      import { getFirestore } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+      import { getStorage } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
+
+      // Your web app's Firebase configuration
+      const firebaseConfig = {
+        apiKey: "AIzaSyBRMC56VgGoV1-y38hM3yihy4RjPEM4I2s", // PASTE YOUR FIREBASE API KEY
+        authDomain: "sgenius-bfc59.firebaseapp.com",
+        projectId: "sgenius-bfc59",
+        storageBucket: "sgenius-bfc59.appspot.com",
+        messagingSenderId: "489124211039",
+        appId: "1:489124211039:web:77ee09a73d6b8d4cc9aeea"
+      };
+
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+      const storage = getStorage(app);
+
+      // Make auth, db and storage globally available to script.js
+      window.firebase = { auth, db, storage };
+    </script>
+    
+    <!-- Main App Script -->
+    <script src="script.js" type="module"></script>
 </body>
 </html>

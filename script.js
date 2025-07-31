@@ -1,277 +1,278 @@
-// --- Simulated Database for Frontend Only ---
-// This object replaces Firebase Firestore for local storage of app data.
-// It's a simple in-memory store and will reset on page refresh.
-let simulatedDb = {
-    users: {}, // Stores user profiles and their nested logs
-    classrooms: [],
-    groups: [],
-};
+// --- Firebase & Backend Configuration ---
+const { auth, db, storage } = window.firebase;
+import {
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    updateProfile,
+    signOut,
+    onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+import {
+    doc,
+    setDoc,
+    getDoc,
+    collection,
+    addDoc,
+    query,
+    where,
+    getDocs,
+    updateDoc,
+    serverTimestamp,
+    orderBy
+} from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+import {
+    ref,
+    uploadBytesResumable,
+    getDownloadURL
+} from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
 
-// Initialize with dummy data for testing purposes
-const dummyUser1Uid = 'fake-student-uid-123';
-const dummyUser2Uid = 'fake-teacher-uid-456';
 
-simulatedDb.users[dummyUser1Uid] = {
-    uid: dummyUser1Uid,
-    displayName: 'Alice Student',
-    email: 'student@example.com',
-    role: 'student',
-    school: 'Fake High School',
-    level: 'secondary',
-    subjects: 'Math, Science',
-    totalStudyTime: 7200, // 2 hours in seconds
-    logs: [
-        { id: 'log1', timestamp: Date.now() - 3600000, duration: 1500, reflection: "Revised algebra and geometry." },
-        { id: 'log2', timestamp: Date.now() - 7200000, duration: 900, reflection: "Read history textbook chapter 3." }
-    ]
-};
+// --- IMPORTANT: CONFIGURE THESE ---
+const FLASK_BACKEND_URL = "https://your-backend-app.herokuapp.com"; // <-- PASTE YOUR DEPLOYED BACKEND URL HERE
+const IMGBB_API_KEY = "8c3ac5bab399ca801e354b900052510d"; // <-- PASTE YOUR IMGBB API KEY HERE
+// ------------------------------------
 
-simulatedDb.users[dummyUser2Uid] = {
-    uid: dummyUser2Uid,
-    displayName: 'Mr. Bob Teacher',
-    email: 'teacher@example.com',
-    role: 'teacher',
-    school: 'Fake College',
-    level: 'jc',
-    subjects: 'Physics, Chemistry',
-    totalStudyTime: 1800, // 30 minutes in seconds
-    logs: [
-        { id: 'log3', timestamp: Date.now() - 10800000, duration: 600, reflection: "Prepared lesson plan for next week." }
-    ]
-};
-
-simulatedDb.classrooms.push({
-    id: 'classroom-math',
-    name: 'Calculus I',
-    teacher: 'Mr. Bob Teacher',
-    teacherUid: dummyUser2Uid,
-    createdAt: Date.now() - 86400000
-});
-simulatedDb.classrooms.push({
-    id: 'classroom-history',
-    name: 'World History Basics',
-    teacher: 'Ms. Carol',
-    teacherUid: 'fake-teacher-uid-789',
-    createdAt: Date.now() - 172800000
-});
-
-simulatedDb.groups.push({
-    id: 'group-study',
-    name: 'Weekend Study Crew',
-    members: [dummyUser1Uid, dummyUser2Uid], // Alice and Bob are members
-    createdAt: Date.now() - 259200000
-});
-simulatedDb.groups.push({
-    id: 'group-project',
-    name: 'Biology Project Team',
-    members: [], // Empty for now
-    createdAt: Date.now() - 129600000
-});
 
 // --- Global State ---
-let currentUser = null; // Represents the logged-in user (simulated Firebase User object)
-let currentUserProfile = null; // Stores user profile data from simulatedDb.users
+let currentUser = null;
+let currentUserProfile = null;
+let currentImageFile = null;
+
+// --- Timer State ---
+let timerInterval = null;
+let timeInSeconds = 1500;
+let isTimerRunning = false;
+let initialTime = 1500;
 
 // --- DOM Element References ---
+const landingPageContainer = document.getElementById('landing-page-container');
+const appContainer = document.getElementById('app-container');
 const loginPage = document.getElementById('login-page');
 const mainAppPage = document.getElementById('main-app');
-const mainContent = document.getElementById('main-content'); // Area to inject dynamic content
+const mainContent = document.getElementById('main-content');
 const errorMessage = document.getElementById('error-message');
-const userDisplayNameHeader = document.querySelector('#main-app #user-display-name'); // Specific to main app header
-const logoutBtnHeader = document.querySelector('#main-app #logout-btn'); // Specific to main app header
+const userDisplayNameHeader = document.querySelector('#user-display-name');
+const logoutBtnHeader = document.querySelector('#logout-btn');
 
-// --- Simulated Authentication Functions ---
-// These functions mimic Firebase Auth API behavior
-const simulateAuth = {
-    // Simulates creating a new user. For a frontend-only demo, any non-empty credentials work.
-    createUserWithEmailAndPassword: async (email, password) => {
-        await new Promise(resolve => setTimeout(resolve, 300)); // Simulate network delay
-        if (email.length < 3 || password.length < 6) {
-            throw new Error("Weak password or invalid email format.");
-        }
-        const uid = 'fake-uid-' + Math.random().toString(36).substring(2, 12);
-        const displayName = email.split('@');
-        const user = { uid, email, displayName, getIdToken: async () => 'fake-jwt-token' }; // Fake getIdToken
-        return { user };
-    },
-    // Simulates signing in a user. Uses predefined dummy accounts.
-    signInWithEmailAndPassword: async (email, password) => {
-        await new Promise(resolve => setTimeout(resolve, 300)); // Simulate network delay
-        if (email === 'student@example.com' && password === 'password') {
-            const user = { uid: dummyUser1Uid, email: 'student@example.com', displayName: 'Alice Student', getIdToken: async () => 'fake-jwt-token' };
-            return { user };
-        } else if (email === 'teacher@example.com' && password === 'password') {
-            const user = { uid: dummyUser2Uid, email: 'teacher@example.com', displayName: 'Mr. Bob Teacher', getIdToken: async () => 'fake-jwt-token' };
-            return { user };
-        }
-        throw new Error("Invalid email or password for fake login. Try student@example.com / password or teacher@example.com / password.");
-    },
-    // Simulates updating a user's profile display name
-    updateProfile: async (user, updates) => {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        if (user) {
-            user.displayName = updates.displayName || user.displayName;
-            // Update in simulatedDb as well
-            if (simulatedDb.users[user.uid]) {
-                simulatedDb.users[user.uid].displayName = user.displayName;
-            }
-        }
-    },
-    // Simulates user logout
-    signOut: async () => {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        // In a real app, this would clear session, here we just unset currentUser
-    }
-};
+// --- App Initialization ---
+document.addEventListener('DOMContentLoaded', () => {
+    // Landing page buttons
+    document.getElementById('get-started-btn').addEventListener('click', showLogin);
+    document.getElementById('cta-button').addEventListener('click', showLogin);
 
-// --- Simulated Firestore Functions ---
-// These functions mimic Firebase Firestore API behavior for in-memory data management.
-const simulateFirestore = {
-    collection: (path) => ({ path }), // Returns a simple object representing a collection reference
-    doc: (collectionPath, docId) => ({ collectionPath, docId }), // Returns a simple object representing a document reference
+    // Auth form switching
+    document.getElementById('switch-to-signup').addEventListener('click', (e) => toggleAuthForm(e, 'signup'));
+    document.getElementById('switch-to-login').addEventListener('click', (e) => toggleAuthForm(e, 'login'));
 
-    getDoc: async (docRef) => {
-        await new Promise(resolve => setTimeout(resolve, 100)); // Simulate network delay
-        let data = null;
-        if (docRef.collectionPath === 'users') {
-            data = simulatedDb.users[docRef.docId];
-        } else if (docRef.collectionPath === 'classrooms') {
-            data = simulatedDb.classrooms.find(c => c.id === docRef.docId);
-        } else if (docRef.collectionPath === 'groups') {
-            data = simulatedDb.groups.find(g => g.id === docRef.docId);
-        }
+    // Form submission
+    document.getElementById('login-form').addEventListener('submit', handleLogin);
+    document.getElementById('signup-form').addEventListener('submit', handleSignup);
+    document.getElementById('personalization-form').addEventListener('submit', handlePersonalization);
+    logoutBtnHeader.addEventListener('click', handleLogout);
 
-        return {
-            exists: () => !!data,
-            data: () => data
-        };
-    },
-
-    setDoc: async (docRef, data, options = {}) => {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        if (docRef.collectionPath === 'users') {
-            if (!simulatedDb.users[docRef.docId] || options.merge) {
-                simulatedDb.users[docRef.docId] = { ...simulatedDb.users[docRef.docId], ...data, uid: docRef.docId };
-                if (!simulatedDb.users[docRef.docId].logs) {
-                    simulatedDb.users[docRef.docId].logs = []; // Ensure logs array exists
-                }
-            } else {
-                simulatedDb.users[docRef.docId] = { ...data, uid: docRef.docId, logs: [] }; // Overwrite, fresh logs
-            }
-        }
-    },
-
-    addDoc: async (collectionRef, data) => {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        const newId = 'fake-id-' + Math.random().toString(36).substring(2, 11);
-        if (collectionRef.path === 'classrooms') {
-            simulatedDb.classrooms.push({ id: newId, ...data });
-        } else if (collectionRef.path === 'groups') {
-            simulatedDb.groups.push({ id: newId, ...data });
-        } else if (collectionRef.path.startsWith('users/') && collectionRef.path.endsWith('/logs')) {
-            const uid = collectionRef.path.split('/');
-            if (simulatedDb.users[uid]) {
-                simulatedDb.users[uid].logs.push({ id: newId, ...data });
-            }
-        }
-        return { id: newId };
-    },
-
-    getDocs: async (collectionRef) => {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        let docs = [];
-        if (collectionRef.path === 'classrooms') {
-            docs = simulatedDb.classrooms;
-        } else if (collectionRef.path === 'groups') {
-            docs = simulatedDb.groups;
-        } else if (collectionRef.path === 'users') { // For leaderboard
-            docs = Object.values(simulatedDb.users);
-        } else if (collectionRef.path.startsWith('users/') && collectionRef.path.endsWith('/logs')) {
-            const uid = collectionRef.path.split('/');
-            docs = simulatedDb.users[uid] ? simulatedDb.users[uid].logs : [];
-        }
-
-        return {
-            empty: docs.length === 0,
-            forEach: (callback) => {
-                docs.forEach(doc => callback({ id: doc.id, data: () => doc }));
-            }
-        };
-    },
-
-    updateDoc: async (docRef, data) => {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        if (docRef.collectionPath === 'users') {
-            if (simulatedDb.users[docRef.docId]) {
-                simulatedDb.users[docRef.docId] = { ...simulatedDb.users[docRef.docId], ...data };
-            }
-        } else if (docRef.collectionPath === 'groups') {
-            const groupIndex = simulatedDb.groups.findIndex(g => g.id === docRef.docId);
-            if (groupIndex !== -1) {
-                simulatedDb.groups[groupIndex] = { ...simulatedDb.groups[groupIndex], ...data };
-            }
-        }
-    },
-    // These are typically field value transforms, for simplicity in this demo, they just return the value.
-    // Array operations will be handled manually in the in-memory arrays.
-    arrayUnion: (value) => value,
-    arrayRemove: (value) => value
-};
+    // Initial auth state check
+    onAuthStateChanged(auth, handleAuthStatusChange);
+});
 
 
-// This function mimics the onAuthStateChanged listener, but we call it explicitly.
-async function handleAuthStatusChange(user) {
-    if (user) {
-        currentUser = user;
-        // Ensure currentUser has a getIdToken method if it's checked by features
-        currentUser.getIdToken = currentUser.getIdToken || (async () => 'fake-jwt-token');
+// --- Navigation and UI Toggling ---
 
-        await fetchUserProfile(user.uid);
+function showLogin(e) {
+    if (e) e.preventDefault();
+    landingPageContainer.style.display = 'none';
+    appContainer.style.display = 'block';
+    loginPage.style.display = 'flex';
+    mainAppPage.style.display = 'none';
+    document.getElementById('personalization-modal').style.display = 'none';
+}
 
-        if (userDisplayNameHeader) {
-            userDisplayNameHeader.textContent = currentUser.displayName || currentUser.email;
-        }
+function toggleAuthForm(e, view) {
+    e.preventDefault();
+    const isLogin = view === 'login';
+    document.getElementById('login-form').style.display = isLogin ? 'block' : 'none';
+    document.getElementById('signup-form').style.display = isLogin ? 'none' : 'block';
+    document.getElementById('login-switch-text').style.display = isLogin ? 'none' : 'block';
+    document.getElementById('signup-switch-text').style.display = isLogin ? 'block' : 'none';
+    errorMessage.textContent = '';
+    errorMessage.style.display = 'none';
+}
 
-        loginPage.style.display = 'none';
-        mainAppPage.style.display = 'flex';
+function showPersonalizationModal(role) {
+    loginPage.style.display = 'none';
+    const personalizationModal = document.getElementById('personalization-modal');
+    personalizationModal.style.display = 'flex';
 
-        router(); // Render the current page based on hash
-    } else {
-        // User is signed out.
-        currentUser = null;
-        currentUserProfile = null;
+    const studentOptions = document.getElementById('student-options');
+    const teacherOptions = document.getElementById('teacher-options');
+    const studentInputs = studentOptions.querySelectorAll('input, select');
+    const teacherInputs = teacherOptions.querySelectorAll('input, select');
 
-        loginPage.style.display = 'flex';
-        mainAppPage.style.display = 'none';
-
-        // Optional: clear hash and redirect to base URL
-        window.location.hash = '';
+    if (role === 'student') {
+        studentOptions.style.display = 'block';
+        teacherOptions.style.display = 'none';
+        studentInputs.forEach(input => input.disabled = false);
+        teacherInputs.forEach(input => input.disabled = true);
+    } else { // role === 'teacher'
+        studentOptions.style.display = 'none';
+        teacherOptions.style.display = 'block';
+        studentInputs.forEach(input => input.disabled = true);
+        teacherInputs.forEach(input => input.disabled = false);
     }
 }
 
-// --- SPA (Single Page App) Router ---
+
+// --- Authentication & User Profile Logic ---
+
+async function handleAuthStatusChange(user) {
+    if (user) {
+        currentUser = user;
+        await fetchUserProfile(user.uid);
+
+        if (currentUserProfile && !currentUserProfile.setupComplete) {
+            showPersonalizationModal(currentUserProfile.role);
+        } else if (currentUserProfile) {
+            userDisplayNameHeader.textContent = currentUserProfile.displayName || currentUser.email;
+            landingPageContainer.style.display = 'none';
+            appContainer.style.display = 'block';
+            loginPage.style.display = 'none';
+            document.getElementById('personalization-modal').style.display = 'none';
+            mainAppPage.style.display = 'flex';
+            window.addEventListener('hashchange', router);
+            router(); // Initial route
+        }
+        // If profile is somehow null, logout to be safe
+        else {
+             handleLogout();
+        }
+    } else {
+        currentUser = null;
+        currentUserProfile = null;
+        window.removeEventListener('hashchange', router);
+        landingPageContainer.style.display = 'block';
+        appContainer.style.display = 'none';
+        window.location.hash = ''; // Clear hash on logout
+    }
+}
+
+async function handleLogin(e) {
+    e.preventDefault();
+    errorMessage.style.display = 'none';
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    try {
+        await signInWithEmailAndPassword(auth, email, password);
+        // onAuthStateChanged will handle the rest
+    } catch (error) {
+        errorMessage.textContent = "Invalid credentials or user not found.";
+        errorMessage.style.display = 'block';
+    }
+}
+
+async function handleSignup(e) {
+    e.preventDefault();
+    errorMessage.textContent = "";
+    const displayName = document.getElementById('signup-name').value;
+    const email = document.getElementById('signup-email').value;
+    const password = document.getElementById('signup-password').value;
+    const role = document.querySelector('input[name="role"]:checked').value;
+
+    try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        await updateProfile(user, { displayName });
+
+        const userProfile = {
+            uid: user.uid,
+            displayName,
+            email,
+            role,
+            setupComplete: false,
+            createdAt: serverTimestamp(),
+            classrooms: []
+        };
+        await setDoc(doc(db, "users", user.uid), userProfile);
+        currentUserProfile = userProfile;
+        currentUser = user;
+        showPersonalizationModal(role);
+
+    } catch (error) {
+        errorMessage.textContent = error.message;
+        errorMessage.style.display = 'block';
+    }
+}
+
+async function handlePersonalization(e) {
+    e.preventDefault();
+    if (!currentUser) return;
+
+    // We already have the role from signup, stored in currentUserProfile
+    const role = currentUserProfile.role;
+    let profileData = {};
+
+    if (role === 'student') {
+        profileData = {
+            level: document.getElementById('student-level').value,
+            subjects: document.getElementById('student-subjects').value.split(',').map(s => s.trim()).filter(Boolean),
+        };
+    } else { // teacher
+        profileData = {
+            school: document.getElementById('teacher-school').value,
+            subjects: document.getElementById('teacher-subjects').value.split(',').map(s => s.trim()).filter(Boolean),
+        };
+    }
+    
+    profileData.setupComplete = true;
+
+    try {
+        await updateDoc(doc(db, "users", currentUser.uid), profileData);
+        // Force re-fetch of profile and trigger standard auth flow
+        await handleAuthStatusChange(currentUser);
+    } catch(error) {
+        console.error("Error saving personalization:", error);
+        alert("Could not save your preferences. Please try again.");
+    }
+}
+
+
+async function handleLogout() {
+    await signOut(auth);
+}
+
+async function fetchUserProfile(uid) {
+    const docRef = doc(db, 'users', uid);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+        currentUserProfile = { uid, ...docSnap.data() };
+    } else {
+        // This case might happen on first signup if firestore is slow
+        // or if there's a serious data issue.
+        console.warn("Could not fetch user profile for UID:", uid);
+        currentUserProfile = null;
+    }
+}
+
+// --- Routing ---
 const routes = {
     '#dashboard': renderDashboard,
     '#classrooms': renderClassrooms,
-    '#groups': renderGroups,
     '#logbook': renderLogbook,
     '#profile': renderProfile,
 };
 
 async function router() {
-    if (!currentUser) { // If not logged in, always show login page.
-        handleAuthStatusChange(null);
-        return;
-    }
-    const hash = window.location.hash || '#dashboard'; // Default to dashboard
-    const render_function = routes[hash];
+    if (!currentUser) return;
+    
+    // Classroom detail route, e.g., #classrooms/CLASS_ID
+    const hash = window.location.hash || '#dashboard';
+    const [path, id] = hash.split('/');
 
-    if (render_function) {
-        mainContent.innerHTML = 'Loading...'; // Show loading state
-        await render_function(); // Call the function to render the page
-        updateActiveNavLink(hash);
+    const renderFunction = routes[path];
+
+    if (renderFunction) {
+        mainContent.innerHTML = '<h2>Loading...</h2>';
+        await renderFunction(id); // Pass ID to renderer
+        updateActiveNavLink(path);
     } else {
-        // If the hash is invalid, go to the dashboard
         window.location.hash = '#dashboard';
     }
 }
@@ -282,110 +283,7 @@ function updateActiveNavLink(activeHash) {
     });
 }
 
-// Listen for hash changes to navigate between pages.
-window.addEventListener('hashchange', router);
-
-// Initial check for authentication status on page load (mimics initial Firebase check)
-// For this demo, we assume no user is logged in initially, requiring a fake login.
-handleAuthStatusChange(null);
-
-
-// Helper function to get the user's profile data from simulatedDb.users.
-async function fetchUserProfile(uid) {
-    const docRef = simulateFirestore.doc('users', uid);
-    const docSnap = await simulateFirestore.getDoc(docRef);
-    if (docSnap.exists()) {
-        currentUserProfile = { uid, ...docSnap.data() };
-    } else {
-        // If user document doesn't exist (e.g., new signup before profile save), create a basic one
-        currentUserProfile = {
-            uid,
-            displayName: currentUser.displayName || currentUser.email,
-            email: currentUser.email,
-            role: "student",
-            school: "",
-            level: "",
-            subjects: "",
-            totalStudyTime: 0,
-            logs: [] // Ensure logs array is initialized
-        };
-        await simulateFirestore.setDoc(docRef, currentUserProfile);
-    }
-}
-
-// --- Auth Form Event Listeners ---
-document.getElementById('switch-to-signup').addEventListener('click', (e) => {
-    e.preventDefault();
-    document.getElementById('login-form').style.display = 'none';
-    document.getElementById('signup-form').style.display = 'block';
-    document.getElementById('login-switch-text').style.display = 'none';
-    document.getElementById('signup-switch-text').style.display = 'block';
-    errorMessage.style.display = 'none';
-});
-
-document.getElementById('switch-to-login').addEventListener('click', (e) => {
-    e.preventDefault();
-    document.getElementById('login-form').style.display = 'block';
-    document.getElementById('signup-form').style.display = 'none';
-    document.getElementById('login-switch-text').style.display = 'block';
-    document.getElementById('signup-switch-text').style.display = 'none';
-    errorMessage.style.display = 'none';
-});
-
-document.getElementById('signup-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    errorMessage.style.display = 'none';
-    const displayName = document.getElementById('signup-name').value;
-    const email = document.getElementById('signup-email').value;
-    const password = document.getElementById('signup-password').value;
-
-    try {
-        const userCredential = await simulateAuth.createUserWithEmailAndPassword(email, password);
-        await simulateAuth.updateProfile(userCredential.user, { displayName });
-        // Create a corresponding user document in simulatedDb.users.
-        // Also initialize totalStudyTime and logs array.
-        await simulateFirestore.setDoc(simulateFirestore.doc("users", userCredential.user.uid), {
-            displayName, email, role: "student", school: "", level: "", subjects: "", totalStudyTime: 0, logs: []
-        });
-        handleAuthStatusChange(userCredential.user); // Manually trigger state change
-    } catch (error) {
-        console.error("Signup failed:", error);
-        errorMessage.textContent = error.message;
-        errorMessage.style.display = 'block';
-    }
-});
-
-document.getElementById('login-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    errorMessage.style.display = 'none';
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-password').value;
-
-    try {
-        const userCredential = await simulateAuth.signInWithEmailAndPassword(email, password);
-        handleAuthStatusChange(userCredential.user); // Manually trigger state change
-    } catch (error) {
-        console.error("Login failed:", error);
-        errorMessage.textContent = error.message;
-        errorMessage.style.display = 'block';
-    }
-});
-
-if (logoutBtnHeader) {
-    logoutBtnHeader.addEventListener('click', async () => {
-        try {
-            await simulateAuth.signOut();
-            handleAuthStatusChange(null); // Manually trigger state change to signed out
-        } catch (error) {
-            console.error('Logout failed:', error);
-        }
-    });
-}
-
-
-// --- PAGE RENDERING FUNCTIONS ---
-// These functions dynamically create the HTML for each "page" and inject it into the <main> element.
-// They also attach any necessary event listeners for that page's functionality.
+// --- Page Rendering Functions ---
 
 function renderDashboard() {
     mainContent.className = 'main-grid-two-col';
@@ -399,221 +297,220 @@ function renderDashboard() {
             </div>
         </div>
         <div class="widget ai-assistant">
-            <h2>AI Study Assistant (Simulated)</h2>
+            <h2>AI Study Assistant</h2>
             <div class="chat-window" id="chat-window">
-                <!-- Messages will be added here by JS -->
-                <div class="chat-message ai">Hello! How can I help you study today? (This is a simulated AI)</div>
+                <div class="chat-message ai">Hello, ${currentUserProfile.displayName}! I am SGenius, your AI Tutor for the Singapore curriculum. How can I help you today?</div>
             </div>
             <div class="chat-input-area">
-                <input type="text" id="ai-prompt-input" placeholder="Ask about H2 Math, GP essays, and more...">
+                <input type="text" id="ai-prompt-input" placeholder="Explain photosynthesis for PSLE...">
+                <button id="attach-file-btn" title="Attach Image">📎</button>
                 <button id="ask-ai-btn">Send</button>
             </div>
+             <div id="image-preview-container">
+                <div class="preview-wrapper">
+                    <img id="image-preview" src="" alt="Image Preview"/>
+                    <button id="remove-image-btn" title="Remove Image">✖</button>
+                </div>
+             </div>
         </div>`;
-    initFocusTimer(1500); // 25 minutes
+    updateTimerDisplay();
+    initFocusTimerListeners();
     initDashboardListeners();
 }
 
-function renderProfile() {
+async function renderProfile() {
     mainContent.className = 'main-grid-one-col';
-    // Ensure currentUserProfile is loaded before rendering
-    if (!currentUserProfile) {
-        mainContent.innerHTML = `<div class="content-box">Loading profile...</div>`;
-        return;
-    }
+    const profile = currentUserProfile;
     mainContent.innerHTML = `
         <div class="content-box">
             <h2>Profile & Settings</h2>
-            <form id="profile-form">
-                <div class="form-group">
-                    <label for="profile-name">Display Name</label>
-                    <input type="text" id="profile-name" value="${currentUser.displayName || currentUser.email}" required>
-                </div>
-                <div class="form-group">
-                    <label for="profile-email">Email</label>
-                    <input type="email" id="profile-email" value="${currentUser.email}" disabled>
-                </div>
-                <div class="form-group">
-                    <label for="role">Role</label>
-                    <select id="role">
-                        <option value="student" ${currentUserProfile.role === 'student' ? 'selected' : ''}>Student</option>
-                        <option value="teacher" ${currentUserProfile.role === 'teacher' ? 'selected' : ''}>Teacher</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="school">School</label>
-                    <input type="text" id="school" placeholder="Enter your school" value="${currentUserProfile.school || ''}">
-                </div>
-                <div class="form-group">
-                    <label for="level">Level</label>
-                    <select id="level">
-                        <option value="primary" ${currentUserProfile.level === 'primary' ? 'selected' : ''}>Primary</option>
-                        <option value="secondary" ${currentUserProfile.level === 'secondary' ? 'selected' : ''}>Secondary</option>
-                        <option value="jc" ${currentUserProfile.level === 'jc' ? 'selected' : ''}>JC</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="subjects">Subjects</label>
-                    <input type="text" id="subjects" placeholder="e.g. H2 Math, GP" value="${currentUserProfile.subjects || ''}">
-                </div>
-                <button type="submit" class="btn btn-success">Save Profile</button>
-            </form>
+            <p><strong>Name:</strong> ${profile.displayName}</p>
+            <p><strong>Email:</strong> ${profile.email}</p>
+            <p><strong>Role:</strong> <span class="role-display ${profile.role}">${profile.role}</span></p>
+            ${profile.role === 'student' ?
+                `<p><strong>Level:</strong> ${profile.level}</p>
+                 <p><strong>Subjects:</strong> ${profile.subjects.join(', ')}</p>` :
+                `<p><strong>School:</strong> ${profile.school}</p>
+                 <p><strong>Subjects Taught:</strong> ${profile.subjects.join(', ')}</p>`
+            }
         </div>`;
-    initProfileListeners();
 }
 
-async function renderClassrooms() {
-    mainContent.className = 'main-grid-one-col';
-    mainContent.innerHTML = `
-        <div class="content-box">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                <h2>Classrooms</h2>
-                ${currentUserProfile && currentUserProfile.role === 'teacher' ? '<button id="create-classroom-btn" class="btn btn-primary">Create Classroom</button>' : ''}
-            </div>
-            <div id="classrooms-list" class="item-list">Loading...</div>
-        </div>`;
-    await loadClassrooms();
-    initClassroomsListeners();
-}
 
-async function renderGroups() {
-    mainContent.className = 'main-grid-one-col';
-    mainContent.innerHTML = `
-         <div class="content-box">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                <h2>My Study Groups</h2>
-                <button id="create-group-btn" class="btn btn-primary">Create New Group</button>
-            </div>
-            <div id="groups-list" class="item-list">Loading...</div>
-            <h3>Leaderboard (Total Study Time)</h3>
-            <ol id="leaderboard-list" class="leaderboard">Loading...</ol>
-        </div>`;
-    await loadGroups();
-    await loadLeaderboard();
-    initGroupsListeners();
-}
+// --- FEATURE: AI Chat ---
 
-async function renderLogbook() {
-    mainContent.className = 'main-grid-one-col';
-    mainContent.innerHTML = `
-        <div class="content-box">
-            <h2>Study Logbook</h2>
-            <div id="logbook-entries" class="item-list">Loading...</div>
-        </div>`;
-    await loadLogs();
-}
-
-// --- FEATURE-SPECIFIC LOGIC & LISTENERS ---
-
-// Dashboard & AI Chat (Simulated)
 function initDashboardListeners() {
-    const askAiBtn = document.getElementById('ask-ai-btn');
-    const aiPromptInput = document.getElementById('ai-prompt-input');
-
-    if (askAiBtn) askAiBtn.addEventListener('click', handleAiPrompt);
-    if (aiPromptInput) aiPromptInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleAiPrompt();
+    document.getElementById('ask-ai-btn').addEventListener('click', handleAiPrompt);
+    document.getElementById('ai-prompt-input').addEventListener('keypress', (e) => e.key === 'Enter' && handleAiPrompt());
+    document.getElementById('attach-file-btn').addEventListener('click', () => {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+        fileInput.onchange = handleImageAttachment;
+        fileInput.click();
     });
+    document.getElementById('remove-image-btn').addEventListener('click', removeImageAttachment);
 }
 
-function addMessageToChat(text, sender) {
-    const chatWindow = document.getElementById('chat-window');
-    if (!chatWindow) return; // Guard
-    const messageDiv = document.createElement('div');
-    messageDiv.classList.add('chat-message', sender); // sender is 'user' or 'ai'
-    messageDiv.textContent = text;
-    chatWindow.appendChild(messageDiv);
-    chatWindow.scrollTop = chatWindow.scrollHeight; // Auto-scroll to bottom
+function handleImageAttachment(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    currentImageFile = file;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        document.getElementById('image-preview').src = event.target.result;
+        document.getElementById('image-preview-container').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
 }
+
+function removeImageAttachment() {
+    currentImageFile = null;
+    document.getElementById('image-preview').src = '';
+    document.getElementById('image-preview-container').style.display = 'none';
+}
+
+
+function addMessageToChat(text, sender, imageUrl = null) {
+    const chatWindow = document.getElementById('chat-window');
+    if (!chatWindow) return;
+    const messageDiv = document.createElement('div');
+    messageDiv.classList.add('chat-message', sender);
+    
+    const textNode = document.createElement('p');
+    textNode.textContent = text;
+    messageDiv.appendChild(textNode);
+
+    if (imageUrl) {
+        const img = document.createElement('img');
+        img.src = imageUrl;
+        img.classList.add('uploaded-image');
+        messageDiv.appendChild(img);
+    }
+    
+    chatWindow.appendChild(messageDiv);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+}
+
+async function uploadImageToImgBB(imageFile) {
+    if (!IMGBB_API_KEY || IMGBB_API_KEY === "YOUR_IMGBB_API_KEY") {
+        alert("Image upload is not configured. Please add an ImgBB API key.");
+        return null;
+    }
+    const formData = new FormData();
+    formData.append('image', imageFile);
+
+    try {
+        const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+            method: 'POST',
+            body: formData
+        });
+        const result = await response.json();
+        if (result.success) {
+            return result.data.url;
+        } else {
+            console.error('ImgBB Upload Error:', result);
+            return null;
+        }
+    } catch (error) {
+        console.error('Error uploading to ImgBB:', error);
+        return null;
+    }
+}
+
 
 async function handleAiPrompt() {
-    const aiPromptInput = document.getElementById('ai-prompt-input');
-    const chatWindow = document.getElementById('chat-window');
-    if (!aiPromptInput || !chatWindow) return; // Guard
+    const input = document.getElementById('ai-prompt-input');
+    const prompt = input.value.trim();
+    if (!prompt && !currentImageFile) return;
 
-    const prompt = aiPromptInput.value.trim();
-    if (!prompt) return;
-
-    addMessageToChat(prompt, 'user');
-    aiPromptInput.value = ''; // Clear input
-
-    // Add a loading indicator
-    const loadingIndicator = document.createElement('div');
-    loadingIndicator.classList.add('chat-message', 'ai', 'loading');
-    loadingIndicator.textContent = 'SGenius is thinking...';
-    chatWindow.appendChild(loadingIndicator);
-    chatWindow.scrollTop = chatWindow.scrollHeight;
-
-    // Simulate AI response delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    chatWindow.removeChild(loadingIndicator); // Remove loading indicator
-
-    let aiResponse = `I'm a simulated AI. I can only echo your input for now. You asked: "${prompt}"`;
-    if (prompt.toLowerCase().includes("math") || prompt.toLowerCase().includes("calculus")) {
-        aiResponse = "For math questions, try reviewing your formulas and practice similar problems from your textbook!";
-    } else if (prompt.toLowerCase().includes("essay") || prompt.toLowerCase().includes("gp")) {
-        aiResponse = "When writing essays, focus on a strong thesis, clear arguments, and supporting evidence. Structure is key!";
-    } else if (prompt.toLowerCase().includes("study tips")) {
-        aiResponse = "Try the Pomodoro Technique! Break your study into 25-minute intervals with short breaks. Also, active recall is super effective.";
+    if (FLASK_BACKEND_URL === "https://your-backend-app.herokuapp.com") {
+        alert("Backend is not configured. Please set the FLASK_BACKEND_URL in script.js");
+        return;
     }
 
-    addMessageToChat(aiResponse, 'ai');
+    const previewSrc = document.getElementById('image-preview').src;
+    addMessageToChat(prompt, 'user', currentImageFile ? previewSrc : null);
+    input.value = '';
+    
+    const loadingMessage = document.createElement('div');
+    loadingMessage.classList.add('chat-message', 'ai', 'loading');
+    loadingMessage.textContent = 'SGenius is thinking...';
+    document.getElementById('chat-window').appendChild(loadingMessage);
+
+    let imageUrl = null;
+    if (currentImageFile) {
+        imageUrl = await uploadImageToImgBB(currentImageFile);
+        if (!imageUrl) {
+             loadingMessage.textContent = 'Error: Could not upload image.';
+             removeImageAttachment();
+             return;
+        }
+    }
+     removeImageAttachment();
+    
+    try {
+        const response = await fetch(`${FLASK_BACKEND_URL}/api/ask`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question: prompt, image_url: imageUrl })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Server responded with status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        loadingMessage.remove();
+        addMessageToChat(data.response, 'ai');
+
+    } catch (error) {
+        console.error("Error fetching AI response:", error);
+        loadingMessage.textContent = `Error: Could not connect to AI assistant. ${error.message}`;
+    }
 }
 
 
-// Focus Timer
-let timerInterval = null;
-let timeInSeconds = 0;
-let isTimerRunning = false;
-let initialTime = 0; // Stores the initial duration of the timer (e.g., 1500 for 25 mins)
+// --- FEATURE: Focus Timer ---
 
-function initFocusTimer(startTimeInSeconds) {
-    timeInSeconds = startTimeInSeconds;
-    initialTime = startTimeInSeconds;
-    isTimerRunning = false;
-    clearInterval(timerInterval);
-    updateTimerDisplay();
+function initFocusTimerListeners() {
     const startStopBtn = document.getElementById('start-stop-timer');
     const resetBtn = document.getElementById('reset-timer');
-    if (startStopBtn) startStopBtn.textContent = 'Start'; // Ensure button text is "Start" on init
-    // Ensure event listeners are only added once
-    if (startStopBtn && !startStopBtn.dataset.listenerAdded) {
-        startStopBtn.addEventListener('click', toggleTimer);
-        startStopBtn.dataset.listenerAdded = 'true';
-    }
-    if (resetBtn && !resetBtn.dataset.listenerAdded) {
-        resetBtn.addEventListener('click', resetTimer);
-        resetBtn.dataset.listenerAdded = 'true';
-    }
+    if (startStopBtn) startStopBtn.addEventListener('click', toggleTimer);
+    if (resetBtn) resetBtn.addEventListener('click', resetTimer);
 }
 
 function updateTimerDisplay() {
-    const timerDisplay = document.getElementById('timer-display');
-    if (!timerDisplay) return; // Guard against element not being on the page
-    const minutes = Math.floor(timeInSeconds / 60);
-    const seconds = timeInSeconds % 60;
-    timerDisplay.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    const minutes = String(Math.floor(timeInSeconds / 60)).padStart(2, '0');
+    const seconds = String(timeInSeconds % 60).padStart(2, '0');
+    const timeString = `${minutes}:${seconds}`;
+
+    const dashboardDisplay = document.getElementById('timer-display');
+    if (dashboardDisplay) dashboardDisplay.textContent = timeString;
+    document.getElementById('header-timer-text').textContent = timeString;
 }
 
 function toggleTimer() {
     isTimerRunning = !isTimerRunning;
     const button = document.getElementById('start-stop-timer');
-    if (!button) return; // Guard
+    const persistentTimerDisplay = document.getElementById('persistent-timer-display');
 
     if (isTimerRunning) {
-        button.textContent = 'Pause';
+        if (button) button.textContent = 'Pause';
+        persistentTimerDisplay.style.display = 'flex';
         timerInterval = setInterval(() => {
             timeInSeconds--;
             updateTimerDisplay();
             if (timeInSeconds <= 0) {
                 clearInterval(timerInterval);
                 isTimerRunning = false;
-                button.textContent = 'Start';
+                if (button) button.textContent = 'Start';
                 handleTimerCompletion();
             }
         }, 1000);
     } else {
-        button.textContent = 'Start';
+        if (button) button.textContent = 'Start';
         clearInterval(timerInterval);
     }
 }
@@ -621,320 +518,395 @@ function toggleTimer() {
 function resetTimer() {
     clearInterval(timerInterval);
     isTimerRunning = false;
-    timeInSeconds = initialTime; // Reset to the initial configured time
-    const startStopBtn = document.getElementById('start-stop-timer');
-    if (startStopBtn) startStopBtn.textContent = 'Start';
+    timeInSeconds = initialTime;
     updateTimerDisplay();
+    const button = document.getElementById('start-stop-timer');
+    if (button) button.textContent = 'Start';
+    document.getElementById('persistent-timer-display').style.display = 'none';
 }
 
 async function handleTimerCompletion() {
-    const duration = initialTime - timeInSeconds; // Actual duration studied before timer hit 0
+    const durationInSeconds = initialTime;
     alert("Time's up! Great focus session.");
     const reflection = prompt("What did you accomplish during this session?");
 
-    if (currentUser && duration > 0) { // Only log if some time was spent
-        // Add to user's logbook subcollection in simulatedDb
-        const logCollectionRef = simulateFirestore.collection(`users/${currentUser.uid}/logs`);
-        await simulateFirestore.addDoc(logCollectionRef, {
-            timestamp: Date.now(), // Use milliseconds timestamp
-            duration: duration,
-            reflection: reflection || ""
-        });
-
-        // Update total study time for leaderboards in the user's main profile document
-        const userDocRef = simulateFirestore.doc('users', currentUser.uid);
-        const currentTotalTime = currentUserProfile.totalStudyTime || 0;
-        const newTotalTime = currentTotalTime + duration;
-
-        await simulateFirestore.updateDoc(userDocRef, { totalStudyTime: newTotalTime });
-        currentUserProfile.totalStudyTime = newTotalTime; // Update local profile
-
-        alert("Session saved to your logbook!");
+    if (currentUser && durationInSeconds > 0) {
+        try {
+            const logCollectionRef = collection(db, `users/${currentUser.uid}/logs`);
+            await addDoc(logCollectionRef, {
+                timestamp: serverTimestamp(),
+                duration: durationInSeconds,
+                reflection: reflection || "N/A"
+            });
+            alert("Session saved to your logbook!");
+        } catch(error) {
+            console.error("Error saving log:", error);
+            alert("Could not save your session to the logbook.");
+        }
     }
-    resetTimer(); // Always reset the timer after completion
+    resetTimer();
 }
 
 
-// Profile Logic
-function initProfileListeners() {
-    const profileForm = document.getElementById('profile-form');
-    if (profileForm) {
-        profileForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const displayNameInput = document.getElementById('profile-name');
-            const roleInput = document.getElementById('role');
-            const schoolInput = document.getElementById('school');
-            const levelInput = document.getElementById('level');
-            const subjectsInput = document.getElementById('subjects');
+// --- FEATURE: Study Logbook ---
 
-            const displayName = displayNameInput.value;
-            const profileData = {
-                displayName: displayName,
-                role: roleInput.value,
-                school: schoolInput.value,
-                level: levelInput.value,
-                subjects: subjectsInput.value,
-            };
-
-            try {
-                // Update simulated Auth profile
-                await simulateAuth.updateProfile(currentUser, { displayName });
-
-                // Update simulated Firestore user document
-                await simulateFirestore.setDoc(simulateFirestore.doc('users', currentUser.uid), profileData, { merge: true });
-
-                // Update UI and local state
-                if (userDisplayNameHeader) userDisplayNameHeader.textContent = displayName;
-                await fetchUserProfile(currentUser.uid); // Re-fetch to ensure local profile is up-to-date
-                alert('Profile saved!');
-            } catch (error) {
-                console.error("Failed to save profile:", error);
-                alert(`Failed to save profile: ${error.message}`);
-            }
-        });
-    }
-}
-
-// Classrooms Logic
-function initClassroomsListeners() {
-    const createClassroomBtn = document.getElementById('create-classroom-btn');
-    if (createClassroomBtn) {
-        createClassroomBtn.addEventListener('click', async () => {
-            const name = prompt('Enter classroom name:');
-            if (!name) return;
-            if (!currentUser) {
-                alert("You must be logged in to create a classroom.");
-                return;
-            }
-            try {
-                await simulateFirestore.addDoc(simulateFirestore.collection('classrooms'), {
-                    name,
-                    teacher: currentUser.displayName || currentUser.email,
-                    teacherUid: currentUser.uid, // Store teacher's UID for permissions/filtering
-                    createdAt: Date.now()
-                });
-                alert('Classroom created!');
-                loadClassrooms(); // Reload list after creation
-            } catch (error) {
-                console.error("Error creating classroom:", error);
-                alert(`Failed to create classroom: ${error.message}`);
-            }
-        });
-    }
-}
-
-async function loadClassrooms() {
-    const classroomsList = document.getElementById('classrooms-list');
-    if (!classroomsList) return;
-    classroomsList.innerHTML = 'Loading classrooms...';
+async function renderLogbook() {
+    mainContent.className = 'main-grid-one-col';
+    mainContent.innerHTML = `
+        <div class="content-box">
+            <h2>Study Logbook</h2>
+            <div id="logbook-entry-list">Loading logs...</div>
+        </div>`;
+    
+    const logList = document.getElementById('logbook-entry-list');
 
     try {
-        const snapshot = await simulateFirestore.getDocs(simulateFirestore.collection('classrooms'));
-        let html = '';
-        if (snapshot.empty) {
-            html = '<p>No classrooms yet.</p>';
-        } else {
-            snapshot.forEach(doc => {
-                const classroom = doc.data();
-                html += `
-                    <div class="list-item">
-                        <strong>${classroom.name}</strong><br>
-                        <span class="meta">Teacher: ${classroom.teacher || 'N/A'}</span>
-                    </div>`;
-            });
+        const logCollectionRef = collection(db, `users/${currentUser.uid}/logs`);
+        const q = query(logCollectionRef, orderBy('timestamp', 'desc'));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            logList.innerHTML = '<p>No study sessions logged yet. Use the Focus Timer to start!</p>';
+            return;
         }
-        classroomsList.innerHTML = html;
+
+        let html = '<ul class="item-list">';
+        querySnapshot.forEach(doc => {
+            const log = doc.data();
+            const date = log.timestamp.toDate().toLocaleString();
+            const duration = `${Math.floor(log.duration / 60)}m ${log.duration % 60}s`;
+            html += `
+                <li class="list-item">
+                    <strong>${log.reflection}</strong>
+                    <div class="meta">${date} - <span>${duration}</span></div>
+                </li>`;
+        });
+        html += '</ul>';
+        logList.innerHTML = html;
+
     } catch (error) {
-        console.error("Error loading classrooms:", error);
-        classroomsList.innerHTML = `<p class="error-message">Failed to load classrooms: ${error.message}</p>`;
+        console.error("Error fetching logs:", error);
+        logList.innerHTML = '<p class="error-text">Could not load your study logs. Please try again later.</p>';
     }
 }
 
-// Groups Logic (with Leaderboard)
-function initGroupsListeners() {
-    const createGroupBtn = document.getElementById('create-group-btn');
-    if (createGroupBtn) {
-        createGroupBtn.addEventListener('click', async () => {
-            const name = prompt('Enter group name:');
-            if (!name) return;
-            if (!currentUser) {
-                alert("You must be logged in to create a group.");
-                return;
-            }
-            try {
-                await simulateFirestore.addDoc(simulateFirestore.collection('groups'), {
-                    name,
-                    members: [currentUser.uid], // Creator is the first member
-                    createdAt: Date.now()
-                });
-                alert('Group created!');
-                loadGroups(); // Reload list
-            } catch (error) {
-                console.error("Error creating group:", error);
-                alert(`Failed to create group: ${error.message}`);
-            }
-        });
-    }
 
-    const groupsList = document.getElementById('groups-list');
-    if (groupsList) {
-        groupsList.addEventListener('click', async (e) => {
-            if (e.target.classList.contains('join-leave-group-btn')) {
-                const groupId = e.target.dataset.groupId;
-                const isMember = e.target.dataset.isMember === 'true'; // Convert string to boolean
-                const groupRef = simulateFirestore.doc('groups', groupId);
+// --- FEATURE: Classrooms ---
 
-                try {
-                    const groupDoc = await simulateFirestore.getDoc(groupRef);
-                    if (groupDoc.exists()) {
-                        const groupData = groupDoc.data();
-                        let updatedMembers = groupData.members ? [...groupData.members] : []; // Create a copy
-
-                        if (isMember) {
-                            // Leave group
-                            updatedMembers = updatedMembers.filter(uid => uid !== currentUser.uid);
-                            alert('You have left the group.');
-                        } else {
-                            // Join group
-                            updatedMembers.push(currentUser.uid);
-                            alert('You have joined the group!');
-                        }
-
-                        // Manually update the simulatedDb for array modifications
-                        // (simulateFirestore.updateDoc itself only overwrites, so we need to do the array logic here)
-                        const targetGroup = simulatedDb.groups.find(g => g.id === groupId);
-                        if (targetGroup) {
-                            targetGroup.members = updatedMembers;
-                        }
-
-                        // Call simulated updateDoc (which will use the updated in-memory object)
-                        await simulateFirestore.updateDoc(groupRef, { members: updatedMembers });
-
-                        loadGroups(); // Reload list
+/**
+ * Main renderer for the classrooms page.
+ * Displays teacher view or student view based on user role.
+ * If a classId is provided in the URL, renders the detail view.
+ */
+async function renderClassrooms(classId) {
+    if (classId) {
+        await renderClassroomDetail(classId);
+    } else {
+        mainContent.className = 'main-grid-one-col';
+        const isTeacher = currentUserProfile.role === 'teacher';
+        
+        mainContent.innerHTML = `
+            <div class="content-box">
+                <div class="content-header">
+                    <h2>Classrooms</h2>
+                    ${isTeacher
+                        ? `<button id="create-class-btn" class="btn">Create New Classroom</button>`
+                        : `<form id="join-class-form" class="join-form"><input type="text" id="join-code-input" placeholder="Enter Join Code" required><button type="submit">Join</button></form>`
                     }
-                } catch (error) {
-                    console.error("Error joining/leaving group:", error);
-                    alert(`Failed to update group membership: ${error.message}`);
-                }
-            }
-        });
-    }
-}
-
-async function loadGroups() {
-    const groupsList = document.getElementById('groups-list');
-    if (!groupsList) return;
-    groupsList.innerHTML = 'Loading groups...';
-    try {
-        const snapshot = await simulateFirestore.getDocs(simulateFirestore.collection('groups'));
-        let html = '';
-        if (snapshot.empty) {
-            html = '<p>No groups yet. Create one!</p>';
+                </div>
+                <div id="classroom-list">Loading classrooms...</div>
+            </div>`;
+        
+        if (isTeacher) {
+            document.getElementById('create-class-btn').addEventListener('click', showCreateClassModal);
         } else {
-            snapshot.forEach(doc => {
-                const group = doc.data();
-                const isMember = group.members && group.members.includes(currentUser.uid);
-                const buttonText = isMember ? 'Leave Group' : 'Join Group';
-                const buttonClass = isMember ? 'btn-secondary' : 'btn-primary';
-                html += `
-                    <div class="list-item">
-                        <strong>${group.name}</strong><br>
-                        <span class="meta">Members: ${group.members ? group.members.length : 0}</span>
-                        <button class="btn ${buttonClass} btn-sm float-end join-leave-group-btn" data-group-id="${group.id}" data-is-member="${isMember}">${buttonText}</button>
-                    </div>`;
-            });
+            document.getElementById('join-class-form').addEventListener('submit', handleJoinClass);
         }
-        groupsList.innerHTML = html;
-    } catch (error) {
-        console.error("Error loading groups:", error);
-        groupsList.innerHTML = `<p class="error-message">Failed to load groups: ${error.message}</p>`;
+
+        await fetchAndDisplayUserClassrooms();
     }
 }
 
-async function loadLeaderboard() {
-    const leaderboardList = document.getElementById('leaderboard-list');
-    if (!leaderboardList) return;
-    leaderboardList.innerHTML = 'Loading leaderboard...';
+/**
+ * Fetches and displays the list of classrooms for the current user.
+ */
+async function fetchAndDisplayUserClassrooms() {
+    const listContainer = document.getElementById('classroom-list');
+    listContainer.innerHTML = '';
+    const isTeacher = currentUserProfile.role === 'teacher';
+    
+    try {
+        const q = isTeacher
+            ? query(collection(db, "classrooms"), where("teacherId", "==", currentUser.uid))
+            : query(collection(db, "classrooms"), where("studentIds", "array-contains", currentUser.uid));
+            
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            listContainer.innerHTML = `<p>No classrooms found. ${isTeacher ? "Create one to get started!" : "Join a class using a code from your teacher."}</p>`;
+            return;
+        }
+
+        let html = '<ul class="item-list">';
+        querySnapshot.forEach(doc => {
+            const classroom = doc.data();
+            html += `
+                <a href="#classrooms/${doc.id}" class="list-item-link">
+                    <li class="list-item">
+                        <strong>${classroom.name}</strong>
+                        <div class="meta">Subject: ${classroom.subject}</div>
+                    </li>
+                </a>`;
+        });
+        html += '</ul>';
+        listContainer.innerHTML = html;
+        
+    } catch(error) {
+        console.error("Error fetching classrooms:", error);
+        listContainer.innerHTML = '<p class="error-text">Could not load classrooms.</p>';
+    }
+}
+
+/**
+ * Shows the modal for creating a new classroom.
+ */
+function showCreateClassModal() {
+    const modalContent = document.getElementById('modal-content');
+    modalContent.innerHTML = `
+        <form id="create-class-form">
+            <h2>Create New Classroom</h2>
+            <div class="input-group">
+                <label for="class-name">Classroom Name</label>
+                <input type="text" id="class-name" required>
+            </div>
+            <div class="input-group">
+                <label for="class-subject">Subject</label>
+                <input type="text" id="class-subject" required>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" id="cancel-modal-btn">Cancel</button>
+                <button type="submit" class="btn">Create</button>
+            </div>
+        </form>
+    `;
+    document.getElementById('modal-backdrop').style.display = 'flex';
+    document.getElementById('cancel-modal-btn').addEventListener('click', hideModal);
+    document.getElementById('create-class-form').addEventListener('submit', handleCreateClass);
+}
+
+/**
+ * Handles the logic for creating a new classroom document in Firestore.
+ */
+async function handleCreateClass(e) {
+    e.preventDefault();
+    const name = document.getElementById('class-name').value;
+    const subject = document.getElementById('class-subject').value;
+    const joinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
     try {
-        // Get all users from simulatedDb and sort by totalStudyTime
-        const usersRef = simulateFirestore.collection('users');
-        const snapshot = await simulateFirestore.getDocs(usersRef);
-
-        let usersData = [];
-        snapshot.forEach(docSnap => {
-            const data = docSnap.data();
-            usersData.push({
-                displayName: data.displayName || 'Unknown User',
-                totalStudyTime: data.totalStudyTime || 0 // Store in seconds
-            });
+        const classroomRef = await addDoc(collection(db, "classrooms"), {
+            name,
+            subject,
+            joinCode,
+            teacherId: currentUser.uid,
+            teacherName: currentUserProfile.displayName,
+            createdAt: serverTimestamp(),
+            studentIds: []
         });
-
-        // Sort by totalStudyTime in descending order
-        usersData.sort((a, b) => b.totalStudyTime - a.totalStudyTime);
-
-        let html = '';
-        if (usersData.length === 0) {
-            html = '<li>No users with study data yet.</li>';
-        } else {
-            usersData.forEach((user, index) => {
-                const totalMinutes = Math.floor(user.totalStudyTime / 60);
-                const hours = Math.floor(totalMinutes / 60);
-                const minutes = totalMinutes % 60;
-                html += `
-                    <li>
-                        <span class="leaderboard-name">${index + 1}. ${user.displayName}</span>
-                        <span class="leaderboard-time">${hours}h ${minutes}m</span>
-                    </li>`;
-            });
-        }
-        leaderboardList.innerHTML = html;
-
+        
+        hideModal();
+        alert(`Classroom created! Join code: ${joinCode}`);
+        window.location.hash = `#classrooms/${classroomRef.id}`;
     } catch (error) {
-        console.error("Error loading leaderboard:", error);
-        leaderboardList.innerHTML = `<li class="error-message">Failed to load leaderboard: ${error.message}</li>`;
+        console.error("Error creating class:", error);
+        alert("Could not create classroom. Please try again.");
     }
 }
 
 
-// Logbook Logic
-async function loadLogs() {
-    const logbookEntries = document.getElementById('logbook-entries');
-    if (!logbookEntries) return;
-    logbookEntries.innerHTML = 'Loading study logs...';
+/**
+ * Handles the logic for a student joining a classroom using a code.
+ */
+async function handleJoinClass(e) {
+    e.preventDefault();
+    const joinCodeInput = document.getElementById('join-code-input');
+    const joinCode = joinCodeInput.value.trim();
+    if (!joinCode) return;
 
-    if (!currentUser) {
-        logbookEntries.innerHTML = '<p>Please log in to view your study logs.</p>';
+    try {
+        const q = query(collection(db, "classrooms"), where("joinCode", "==", joinCode));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            alert("Invalid join code. Please check and try again.");
+            return;
+        }
+
+        const classroomDoc = querySnapshot.docs[0];
+        const classroomData = classroomDoc.data();
+
+        if (classroomData.studentIds.includes(currentUser.uid)) {
+            alert("You are already enrolled in this classroom.");
+            return;
+        }
+
+        const updatedStudentIds = [...classroomData.studentIds, currentUser.uid];
+        await updateDoc(doc(db, "classrooms", classroomDoc.id), {
+            studentIds: updatedStudentIds
+        });
+
+        alert(`Successfully joined "${classroomData.name}"!`);
+        joinCodeInput.value = '';
+        fetchAndDisplayUserClassrooms();
+
+    } catch (error) {
+        console.error("Error joining classroom:", error);
+        alert("An error occurred while trying to join the classroom.");
+    }
+}
+
+
+/**
+ * Renders the detail view for a specific classroom.
+ */
+async function renderClassroomDetail(classId) {
+    mainContent.className = 'main-grid-one-col';
+    try {
+        const classRef = doc(db, 'classrooms', classId);
+        const classSnap = await getDoc(classRef);
+
+        if (!classSnap.exists()) {
+            mainContent.innerHTML = '<h2>Classroom not found.</h2>';
+            return;
+        }
+
+        const classroom = classSnap.data();
+        const isTeacher = classroom.teacherId === currentUser.uid;
+
+        mainContent.innerHTML = `
+            <div class="content-box">
+                <div class="content-header">
+                    <div>
+                        <a href="#classrooms" class="back-link">← Back to Classrooms</a>
+                        <h2>${classroom.name}</h2>
+                        <p class="meta">Subject: ${classroom.subject} | Taught by: ${classroom.teacherName}</p>
+                    </div>
+                    ${isTeacher ? `<p class="join-code">Join Code: <span>${classroom.joinCode}</span></p>` : ''}
+                </div>
+                
+                <div id="classroom-materials">
+                    <h3>Study Materials</h3>
+                    <div id="materials-list">Loading materials...</div>
+                     ${isTeacher ? `
+                        <div class="upload-area">
+                            <h4>Upload New Material</h4>
+                            <input type="file" id="material-upload-input">
+                            <button id="upload-material-btn" class="btn btn-secondary">Upload File</button>
+                            <div id="upload-progress" style="display:none;"></div>
+                        </div>` 
+                    : ''}
+                </div>
+            </div>`;
+
+        if (isTeacher) {
+            document.getElementById('upload-material-btn').addEventListener('click', () => handleMaterialUpload(classId));
+        }
+
+        await fetchAndDisplayMaterials(classId);
+
+    } catch (error) {
+        console.error("Error rendering classroom detail:", error);
+        mainContent.innerHTML = '<h2>Error loading classroom.</h2>';
+    }
+}
+
+/**
+ * Handles the upload of a file to Firebase Storage and links it in Firestore.
+ */
+function handleMaterialUpload(classId) {
+    const fileInput = document.getElementById('material-upload-input');
+    const file = fileInput.files[0];
+    if (!file) {
+        alert("Please select a file to upload.");
         return;
     }
 
-    try {
-        // Referencing the 'logs' subcollection under the current user's document in simulatedDb
-        const logsRef = simulateFirestore.collection(`users/${currentUser.uid}/logs`);
-        const snapshot = await simulateFirestore.getDocs(logsRef);
-        let html = '';
-        if (snapshot.empty) {
-            html = '<p>No study logs yet. Complete a focus session to add one!</p>';
-        } else {
-            // Sort logs by timestamp (most recent first)
-            let logs = [];
-            snapshot.forEach(doc => logs.push({ id: doc.id, ...doc.data() }));
-            logs.sort((a, b) => b.timestamp - a.timestamp); // Sort descending
+    const storageRef = ref(storage, `classrooms/${classId}/${file.name}`);
+    const uploadTask = uploadBytesResumable(storageRef, file);
+    
+    const progressDiv = document.getElementById('upload-progress');
+    const uploadBtn = document.getElementById('upload-material-btn');
+    progressDiv.style.display = 'block';
+    uploadBtn.disabled = true;
 
-            logs.forEach(log => {
-                const date = new Date(log.timestamp).toLocaleString();
-                const durationMinutes = Math.floor(log.duration / 60);
-                html += `
-                    <div class="list-item">
-                        <strong>${date}</strong><br>
-                        <span class="meta">Duration: ${durationMinutes} min</span><br>
-                        <p>Reflection: ${log.reflection || 'No reflection provided.'}</p>
-                    </div>`;
+    uploadTask.on('state_changed',
+        (snapshot) => {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            progressDiv.innerHTML = `Uploading: ${Math.round(progress)}%`;
+        },
+        (error) => {
+            console.error("Upload failed:", error);
+            alert("File upload failed. Please try again.");
+            progressDiv.style.display = 'none';
+            uploadBtn.disabled = false;
+        },
+        async () => {
+            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+            
+            await addDoc(collection(db, `classrooms/${classId}/materials`), {
+                name: file.name,
+                url: downloadURL,
+                uploadedAt: serverTimestamp(),
+                uploader: currentUserProfile.displayName
             });
+
+            progressDiv.innerHTML = 'Upload complete!';
+            uploadBtn.disabled = false;
+            fileInput.value = '';
+            setTimeout(() => { progressDiv.style.display = 'none'; }, 2000);
+
+            // Refresh materials list
+            fetchAndDisplayMaterials(classId);
         }
-        logbookEntries.innerHTML = html;
+    );
+}
+
+/**
+ * Fetches and displays the list of materials for a given classroom.
+ */
+async function fetchAndDisplayMaterials(classId) {
+    const materialsListDiv = document.getElementById('materials-list');
+    
+    try {
+        const q = query(collection(db, `classrooms/${classId}/materials`), orderBy('uploadedAt', 'desc'));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            materialsListDiv.innerHTML = '<p>No materials have been uploaded yet.</p>';
+            return;
+        }
+
+        let html = '<ul class="item-list">';
+        querySnapshot.forEach(doc => {
+            const material = doc.data();
+            html += `
+                <li class="list-item material-item">
+                    <a href="${material.url}" target="_blank" rel="noopener noreferrer">
+                        <strong>${material.name}</strong>
+                    </a>
+                    <div class="meta">Uploaded by ${material.uploader} on ${material.uploadedAt.toDate().toLocaleDateString()}</div>
+                </li>`;
+        });
+        html += '</ul>';
+        materialsListDiv.innerHTML = html;
+        
     } catch (error) {
-        console.error("Error loading study logs:", error);
-        logbookEntries.innerHTML = `<p class="error-message">Failed to load logs: ${error.message}</p>`;
+        console.error("Error fetching materials:", error);
+        materialsListDiv.innerHTML = '<p class="error-text">Could not load materials.</p>';
     }
+}
+
+function hideModal() {
+    document.getElementById('modal-backdrop').style.display = 'none';
+    document.getElementById('modal-content').innerHTML = '';
 }

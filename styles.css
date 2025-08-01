@@ -168,11 +168,13 @@ input, select, button {
 .auth-container p { color: var(--secondary-text); margin-bottom: 30px; }
 .auth-form .input-group, #personalization-form .input-group, .modal-content .input-group { margin-bottom: 20px; text-align: left; }
 .auth-form label, #personalization-form label, .modal-content label { display: block; margin-bottom: 8px; color: var(--secondary-text); font-size: 0.9rem; }
-.auth-form input, #personalization-form input, #personalization-form select, .modal-content input, .modal-content select {
+.auth-form input, #personalization-form input, #personalization-form select, .modal-content input, .modal-content select, .modal-content textarea {
     width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);
     background-color: var(--primary-bg); color: var(--primary-text); font-size: 1rem; box-sizing: border-box;
 }
-.auth-form input:focus, #personalization-form input:focus, #personalization-form select:focus, .modal-content input:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.3); }
+.auth-form input:focus, #personalization-form input:focus, #personalization-form select:focus, .modal-content input:focus, .modal-content textarea:focus { 
+    outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.3); 
+}
 
 .role-selector { margin-bottom: 20px; }
 .role-selector label { text-align: left; display: block; margin-bottom: 10px; color: var(--secondary-text); }
@@ -274,6 +276,7 @@ main::-webkit-scrollbar-thumb:hover { background: #555; }
 .chat-window {
     flex-grow: 1; background-color: var(--primary-bg); border-radius: 8px; padding: 20px;
     overflow-y: auto; margin-bottom: 20px; border: 1px solid var(--border-color); display: flex; flex-direction: column;
+    white-space: pre-wrap; /* Allows text to wrap and preserves line breaks */
 }
 .chat-message { margin-bottom: 15px; padding: 10px 15px; border-radius: 10px; max-width: 85%; word-wrap: break-word; }
 .chat-message.user { background-color: var(--accent-color); color: white; margin-left: auto; text-align: right; border-bottom-right-radius: 2px; }
@@ -288,17 +291,12 @@ main::-webkit-scrollbar-thumb:hover { background: #555; }
     background-color: var(--primary-bg); color: var(--primary-text); font-size: 1rem;
 }
 #ai-prompt-input:focus { outline: none; border-color: var(--accent-color); }
-#ask-ai-btn, #attach-file-btn {
+#ask-ai-btn {
     padding: 0 25px; border: none; border-radius: 8px; background-color: var(--accent-color);
     color: white; font-size: 1rem; cursor: pointer; transition: background-color 0.3s ease;
 }
-#attach-file-btn { background-color: #6c757d; }
 #ask-ai-btn:hover { background-color: var(--accent-hover); }
-#attach-file-btn:hover { background-color: #5a6268; }
-#image-preview-container { width: 100%; margin-top: 10px; display: none; }
-#image-preview-container .preview-wrapper { display: inline-flex; align-items: center; background-color: var(--primary-bg); padding: 5px 10px; border-radius: 15px; }
-#image-preview { height: 30px; width: auto; border-radius: 5px; margin-right: 10px; }
-#remove-image-btn { background: none; border: none; color: #ff5555; cursor: pointer; font-weight: bold; }
+
 
 /* --- MODAL STYLES --- */
 .modal-backdrop {
@@ -367,14 +365,17 @@ a.list-item-link { text-decoration: none; }
 .submission-card h4 { margin-top: 0; }
 .submission-image { max-width: 200px; height: auto; border-radius: 8px; cursor: pointer; transition: transform 0.2s; }
 .submission-image:hover { transform: scale(1.5); }
-.feedback-box { background-color: var(--secondary-bg); border-left: 3px solid var(--accent-color); padding: 15px; margin-top: 10px; border-radius: 4px; }
+.feedback-box { background-color: var(--secondary-bg); border-left: 3px solid var(--accent-color); padding: 15px; margin-top: 10px; border-radius: 4px; white-space: pre-wrap; }
 .status-badge { padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; color: white; }
 .status-graded { background-color: var(--success-color); }
 .status-submitted { background-color: var(--warning-color); color: #121212;}
 .status-viewed { background-color: var(--secondary-text); }
+.status-not-viewed { background-color: #444; }
 
-.grading-form { display: flex; gap: 10px; align-items: center; margin-top: 10px; }
-.grading-form input { flex-grow: 1; }
+
+.grading-form { display: flex; flex-direction: column; gap: 10px; align-items: stretch; margin-top: 10px; }
+.grading-form input, .grading-form textarea { width: 100%; box-sizing: border-box; }
+.grading-form textarea { min-height: 80px; resize: vertical; }
 
 /* Leaderboard Styles */
 .leaderboard-tabs { display: flex; gap: 10px; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; }
@@ -387,3 +388,27 @@ a.list-item-link { text-decoration: none; }
 .rank-list .rank { font-size: 1.2rem; font-weight: bold; color: var(--accent-color); width: 40px; text-align: center; }
 .rank-list .user-info { flex-grow: 1; margin-left: 20px; }
 .rank-list .time { font-size: 1.1rem; font-weight: 500; }
+
+/* AI Hint specific styles */
+.hint-container {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+}
+#get-hint-btn {
+    background-color: var(--warning-color);
+    color: #121212;
+    font-weight: bold;
+}
+#get-hint-btn:hover {
+    background-color: #fbc02d;
+}
+#hint-box {
+    background-color: rgba(253, 216, 53, 0.1);
+    border-left: 3px solid var(--warning-color);
+    padding: 15px;
+    margin-top: 15px;
+    border-radius: 4px;
+    color: var(--warning-color);
+    white-space: pre-wrap;
+}

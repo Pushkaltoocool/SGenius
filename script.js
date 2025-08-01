@@ -1,5 +1,5 @@
 // --- Firebase & Backend Configuration ---
-const { auth, db } = window.firebase; // Removed 'storage'
+const { auth, db } = window.firebase;
 import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
@@ -21,11 +21,9 @@ import {
     orderBy,
     Timestamp
 } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
-// Removed all imports from firebase/storage
-
 
 // --- IMPORTANT: CONFIGURE THESE ---
-const FLASK_BACKEND_URL = "https://your-backend-app.herokuapp.com"; // <-- PASTE YOUR DEPLOYED BACKEND URL HERE
+const FLASK_BACKEND_URL = "https://sgenius.onrender.com"; // <-- YOUR DEPLOYED BACKEND URL
 const IMGBB_API_KEY = "8c3ac5bab399ca801e354b900052510d"; // <-- PASTE YOUR IMGBB API KEY HERE
 // ------------------------------------
 
@@ -250,7 +248,7 @@ async function fetchUserProfile(uid) {
 // --- NEW, ROBUST ROUTER ---
 const routes = {
     '#dashboard': renderDashboard,
-    '#classrooms': renderClassrooms, // This will always render the list now
+    '#classrooms': renderClassrooms,
     '#logbook': renderLogbook,
     '#profile': renderProfile,
     '#leaderboard': renderLeaderboard,
@@ -260,9 +258,9 @@ async function router() {
     if (!currentUser) return;
 
     const hash = window.location.hash || '#dashboard';
-    const pathParts = hash.substring(1).split('/'); // e.g., "#classrooms/123" -> ["classrooms", "123"]
+    const pathParts = hash.substring(1).split('/'); 
 
-    mainContent.innerHTML = '<h2>Loading...</h2>';
+    mainContent.innerHTML = '<div class="content-box"><h2>Loading...</h2></div>';
 
     // Route: #classrooms/CLASS_ID/assignment/ASSIGNMENT_ID
     if (pathParts[0] === 'classrooms' && pathParts.length === 4 && pathParts[2] === 'assignment' && pathParts[3]) {
@@ -281,13 +279,12 @@ async function router() {
         return;
     }
 
-    // Standard routes (e.g., #dashboard, #profile)
+    // Standard routes
     const renderFunction = routes['#'+pathParts[0]] || routes['#dashboard'];
     if (renderFunction) {
         await renderFunction();
         updateActiveNavLink('#'+pathParts[0]);
     } else {
-        // Fallback to dashboard if route is unknown
         window.location.hash = '#dashboard';
     }
 }
@@ -325,13 +322,17 @@ function renderDashboard() {
         </div>
         <div class="widget ai-assistant">
             <h2>AI Study Assistant</h2>
-            <p style="text-align: center; color: var(--secondary-text);">The AI Assistant is now integrated into classroom assignments. Get personalized feedback from your teacher after they grade your work!</p>
-             <div class="chat-window" id="chat-window">
-                <div class="chat-message ai">Hello, ${currentUserProfile.displayName}! Use the Focus Timer to track your study sessions or head to the Classrooms tab to work on assignments.</div>
+            <div class="chat-window" id="chat-window">
+                <div class="chat-message ai">Hello, ${currentUserProfile.displayName}! Ask me anything about your subjects, from explaining concepts to solving problems.</div>
             </div>
+            <form class="chat-input-area" id="ai-chat-form">
+                <input type="text" id="ai-prompt-input" placeholder="Ask SGenius a question..." required>
+                <button type="submit" id="ask-ai-btn" class="btn">Ask</button>
+            </form>
         </div>`;
     updateTimerDisplay();
     initFocusTimerListeners();
+    initAiChatListeners();
 }
 
 async function renderProfile() {
@@ -351,6 +352,63 @@ async function renderProfile() {
             }
             <p class="meta" style="margin-top: 20px;">To update your details, you will need to re-create your profile (feature coming soon).</p>
         </div>`;
+}
+
+
+// --- FEATURE: AI Chat Assistant ---
+function initAiChatListeners() {
+    const chatForm = document.getElementById('ai-chat-form');
+    if(chatForm) {
+        chatForm.addEventListener('submit', handleAiChatSubmit);
+    }
+}
+
+async function handleAiChatSubmit(e) {
+    e.preventDefault();
+    const input = document.getElementById('ai-prompt-input');
+    const userMessage = input.value.trim();
+    if (!userMessage) return;
+
+    const chatWindow = document.getElementById('chat-window');
+    addMessageToChat(userMessage, 'user');
+    input.value = '';
+    
+    // FIX: Pass 'ai' and 'loading' as separate classes
+    addMessageToChat('SGenius is thinking...', 'ai', 'loading');
+
+    try {
+        const response = await fetch(`${FLASK_BACKEND_URL}/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: userMessage })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Server responded with status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const aiMessage = data.response;
+
+        chatWindow.querySelector('.loading')?.remove();
+        addMessageToChat(aiMessage, 'ai');
+
+    } catch (error) {
+        console.error('AI Chat Error:', error);
+        chatWindow.querySelector('.loading')?.remove();
+        addMessageToChat('Sorry, I encountered an error. Please try again later.', 'ai');
+    }
+}
+
+// FIX: Modified function to accept multiple classes using rest parameters
+function addMessageToChat(text, ...types) {
+    const chatWindow = document.getElementById('chat-window');
+    const messageElement = document.createElement('div');
+    // FIX: Use spread syntax to add all provided classes
+    messageElement.classList.add('chat-message', ...types);
+    messageElement.textContent = text;
+    chatWindow.appendChild(messageElement);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
 }
 
 
@@ -749,7 +807,7 @@ async function handleCreateClass(e) {
 async function handleJoinClass(e) {
     e.preventDefault();
     const joinCodeInput = document.getElementById('join-code-input');
-    const joinCode = joinCodeInput.value.trim();
+    const joinCode = joinCodeInput.value.trim().toUpperCase();
     if (!joinCode) return;
 
     try {
@@ -822,7 +880,7 @@ async function renderClassroomDetail(classId) {
 
     } catch (error) {
         console.error("Error rendering classroom detail:", error);
-        mainContent.innerHTML = `<h2>Error loading classroom. <a href="#classrooms">Go back</a></h2>`;
+        mainContent.innerHTML = `<div class="content-box"><h2>Error loading classroom. <a href="#classrooms">Go back</a></h2></div>`;
     }
 }
 
@@ -939,7 +997,7 @@ async function renderAssignmentDetail(assignmentId, classId) {
         }
     } catch(error) {
         console.error("Error rendering assignment detail:", error);
-        mainContent.innerHTML = `<h2>Error loading assignment. <a href="#classrooms/${classId}">Go back</a></h2>`;
+        mainContent.innerHTML = `<div class="content-box"><h2>Error loading assignment. <a href="#classrooms/${classId}">Go back</a></h2></div>`;
     }
 }
 
@@ -966,7 +1024,7 @@ async function renderAssignmentDetail_StudentView(assignment) {
                 <h4>Grade & Feedback</h4>
                 <p><strong>Grade:</strong> ${submissionData.grade}</p>
                 <div class="feedback-box">
-                    <strong>AI Feedback:</strong>
+                    <strong>Teacher's AI-Powered Feedback:</strong>
                     <p>${submissionData.feedback || "No feedback provided."}</p>
                 </div>
             ` : '<p>Your work has been submitted and is awaiting grading.</p>'}
@@ -981,6 +1039,10 @@ async function renderAssignmentDetail_StudentView(assignment) {
                 </div>
                 <button type="submit" class="btn">Submit Work</button>
             </form>
+            <div class="hint-container">
+                <button id="get-hint-btn" class="btn">Stuck? Ask SGenius for a Hint</button>
+                <div id="hint-box" style="display:none;"></div>
+            </div>
         `;
     }
 
@@ -1002,7 +1064,38 @@ async function renderAssignmentDetail_StudentView(assignment) {
     if (document.getElementById('submission-form')) {
         document.getElementById('submission-form').addEventListener('submit', e => handleStudentSubmission(e, assignment));
     }
+    if (document.getElementById('get-hint-btn')) {
+        document.getElementById('get-hint-btn').addEventListener('click', () => handleGetHint(assignment));
+    }
 }
+
+async function handleGetHint(assignment) {
+    const hintBtn = document.getElementById('get-hint-btn');
+    const hintBox = document.getElementById('hint-box');
+    hintBtn.disabled = true;
+    hintBtn.textContent = 'Getting a hint...';
+    hintBox.style.display = 'block';
+    hintBox.textContent = 'SGenius is thinking...';
+
+    try {
+        const response = await fetch(`${FLASK_BACKEND_URL}/api/hint`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ subject: assignment.subject, title: assignment.title })
+        });
+        if (!response.ok) throw new Error('Failed to get hint from server.');
+
+        const data = await response.json();
+        hintBox.textContent = data.hint;
+
+    } catch(error) {
+        console.error("Error getting hint:", error);
+        hintBox.textContent = "Sorry, couldn't get a hint right now. Please try again later.";
+        hintBtn.disabled = false;
+        hintBtn.textContent = 'Stuck? Ask SGenius for a Hint';
+    }
+}
+
 
 async function handleStudentSubmission(e, assignment) {
     e.preventDefault();
@@ -1069,7 +1162,7 @@ async function renderAssignmentDetail_TeacherView(assignment) {
     let html = '<ul class="item-list">';
     students.forEach(student => {
         const submission = submissions[student.uid];
-        let statusBadge = '<span class="status-badge">Not Viewed</span>';
+        let statusBadge = '<span class="status-badge status-not-viewed">Not Viewed</span>';
         let submissionContent = '';
 
         if(submission) {
@@ -1081,7 +1174,7 @@ async function renderAssignmentDetail_TeacherView(assignment) {
                         <img src="${submission.submissionImageUrl}" class="submission-image">
                         <form class="grading-form" data-student-id="${student.uid}">
                             <input type="text" class="grading-input" placeholder="Enter Grade (e.g., 85/100)" required>
-                            <button type="submit" class="btn btn-sm">Save Grade</button>
+                            <button type="submit" class="btn btn-sm">Generate Feedback & Save</button>
                         </form>
                     </div>`;
             }
@@ -1090,7 +1183,10 @@ async function renderAssignmentDetail_TeacherView(assignment) {
                 submissionContent = `
                      <div class="submission-card">
                         <img src="${submission.submissionImageUrl}" class="submission-image">
-                        <div class="feedback-box"><strong>Feedback:</strong> ${submission.feedback}</div>
+                        <div class="feedback-box">
+                            <strong>AI-Generated Feedback:</strong>
+                            <p>${submission.feedback}</p>
+                        </div>
                     </div>`;
             }
         }
@@ -1117,18 +1213,22 @@ async function handleGrading(e, assignment) {
     e.preventDefault();
     const form = e.target;
     const studentId = form.dataset.studentId;
-    const grade = form.querySelector('.grading-input').value;
+    const grade = form.querySelector('.grading-input').value.trim();
     if (!grade) return;
     
     const gradeButton = form.querySelector('button');
     gradeButton.disabled = true;
-    gradeButton.textContent = "Saving...";
+    gradeButton.textContent = "Generating...";
 
     try {
         const feedbackResponse = await fetch(`${FLASK_BACKEND_URL}/api/feedback`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ subject: assignment.subject, grade: grade })
+            body: JSON.stringify({ 
+                subject: assignment.subject, 
+                grade: grade,
+                title: assignment.title
+            })
         });
         if (!feedbackResponse.ok) throw new Error("AI feedback server error.");
         const feedbackData = await feedbackResponse.json();
@@ -1142,21 +1242,25 @@ async function handleGrading(e, assignment) {
             gradedAt: serverTimestamp()
         });
 
-        alert(`Grade saved and feedback generated for student.`);
+        alert(`Grade saved and AI feedback sent to the student.`);
         renderAssignmentDetail(assignment.id, assignment.classId); // Refresh view
 
     } catch(error) {
         console.error("Error during grading:", error);
         alert("An error occurred. Could not save grade.");
         gradeButton.disabled = false;
-        gradeButton.textContent = "Save Grade";
+        gradeButton.textContent = "Generate Feedback & Save";
     }
 }
 
 
 function hideModal() {
-    document.getElementById('modal-backdrop').style.display = 'none';
-    if(document.getElementById('modal-content')) {
-        document.getElementById('modal-content').innerHTML = '';
+    const modalBackdrop = document.getElementById('modal-backdrop');
+    if (modalBackdrop) {
+        modalBackdrop.style.display = 'none';
+    }
+    const modalContent = document.getElementById('modal-content');
+    if(modalContent) {
+        modalContent.innerHTML = '';
     }
 }

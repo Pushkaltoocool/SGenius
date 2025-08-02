@@ -740,6 +740,36 @@ form.auth-form { margin-top: 2rem; }
 .grading-form input { flex-grow: 1; }
 .grading-form button { flex-shrink: 0; }
 
+/* --- Missing Modal Styles --- */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent black overlay */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000; /* Ensure it's on top of everything */
+}
+
+.modal-content {
+    background: var(--c-bg-alt);
+    padding: 2rem;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    width: 100%;
+    max-width: 500px; /* Or any width you prefer */
+}
+
+.modal-actions {
+    margin-top: 1.5rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
 
 /* --- 14. Mobile Responsiveness --- */
 @media (max-width: 992px) {

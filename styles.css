@@ -412,3 +412,175 @@ a.list-item-link { text-decoration: none; }
     color: var(--warning-color);
     white-space: pre-wrap;
 }
+
+/* --- Styles for AI Quiz Feature --- */
+.quiz-setup-container, .review-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+.quiz-form .input-group {
+    margin-bottom: 25px;
+}
+.quiz-form .input-group label {
+    font-size: 1rem;
+    font-weight: bold;
+    color: var(--primary-text);
+}
+.quiz-form input[type="text"],
+.quiz-form select,
+.quiz-form input[type="number"] {
+    padding: 14px;
+    font-size: 1.1rem;
+}
+
+#other-subject-group {
+    display: none; /* Hidden by default */
+}
+
+/* --- Styles for Displaying The Quiz --- */
+.quiz-display-container {
+    counter-reset: question-counter;
+}
+.question-block {
+    background-color: var(--primary-bg);
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid var(--border-color);
+}
+.question-block::before {
+    counter-increment: question-counter;
+    content: "Question " counter(question-counter);
+    font-weight: bold;
+    color: var(--accent-color);
+    display: block;
+    margin-bottom: 10px;
+}
+.question-text {
+    font-size: 1.2rem;
+    margin-bottom: 15px;
+}
+.options-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.options-list label {
+    display: block;
+    background-color: var(--secondary-bg);
+    padding: 15px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.2s ease;
+}
+.options-list label:hover {
+    border-color: var(--accent-color);
+}
+.options-list input[type="radio"] {
+    display: none;
+}
+.options-list input[type="radio"]:checked + span {
+    font-weight: bold;
+}
+
+/* --- Styles for Quiz Results --- */
+.results-summary {
+    text-align: center;
+    padding: 20px;
+    background-color: var(--primary-bg);
+    border-radius: 12px;
+    margin-bottom: 30px;
+}
+.results-summary h3 {
+    margin-top: 0;
+    font-size: 2rem;
+    color: var(--primary-text);
+}
+.results-summary p {
+    font-size: 1.5rem;
+    color: var(--accent-color);
+    font-weight: bold;
+}
+.quiz-results .question-block {
+    position: relative;
+    padding-right: 50px; /* Space for checkbox */
+}
+.quiz-results .options-list label {
+    cursor: default;
+}
+.quiz-results .options-list label.correct-answer {
+    background-color: rgba(67, 160, 71, 0.2);
+    border-color: var(--success-color);
+}
+.quiz-results .options-list label.incorrect-answer {
+    background-color: rgba(229, 57, 53, 0.2);
+    border-color: var(--error-color);
+    opacity: 0.7;
+}
+.explanation-box {
+    background-color: var(--secondary-bg);
+    border-left: 3px solid var(--accent-color);
+    padding: 15px;
+    margin-top: 20px;
+    border-radius: 4px;
+}
+.explanation-box strong {
+    color: var(--accent-color);
+}
+
+.review-checkbox {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 25px;
+    height: 25px;
+    cursor: pointer;
+}
+#save-review-btn {
+    display: block;
+    width: 100%;
+    max-width: 400px;
+    margin: 30px auto 0;
+    padding: 15px;
+    font-size: 1.2rem;
+}
+
+/* --- Styles for Review Page --- */
+.review-question-card {
+    background-color: var(--primary-bg);
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+/* --- Study Streak Widget --- */
+.streak-widget {
+    background-color: var(--card-bg);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    border: 1px solid var(--border-color);
+}
+.streak-widget .emoji {
+    font-size: 3rem;
+    line-height: 1;
+}
+.streak-widget h3 {
+    margin: 10px 0 5px 0;
+    color: var(--primary-text);
+}
+.streak-widget p {
+    margin: 0;
+    font-size: 1.8rem;
+    color: var(--warning-color);
+    font-weight: bold;
+}
+.streak-widget .meta {
+    font-size: 0.9rem;
+    color: var(--secondary-text);
+    margin-top: 5px;
+}

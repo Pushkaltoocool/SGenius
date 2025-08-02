@@ -1,11 +1,10 @@
-<!DOCTYPE html>
+!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SGenius - Your AI Study Partner</title>
     <link rel="stylesheet" href="styles.css">
-    <!-- FIX: Added favicon link to prevent 404 error -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎓</text></svg>">
 </head>
 <body>
@@ -130,29 +129,31 @@
         </div>
 
 
-        <!-- MAIN APP DASHBOARD (Hidden by default) -->
-        <div id="main-app" class="page" style="display: none;">
-             <div class="dashboard-container">
-                <header>
-                    <div class="logo">S<span class="accent">Genius</span></div>
-                    <nav>
-                        <a href="#dashboard" class="nav-link active">Dashboard</a>
-                        <a href="#classrooms" class="nav-link">Classrooms</a>
-                        <a href="#logbook" class="nav-link">Logbook</a>
-                        <a href="#leaderboard" class="nav-link">Leaderboard</a>
-                        <a href="#profile" class="nav-link">Profile</a>
-                    </nav>
-                    <div class="user-info">
-                        <div id="persistent-timer-display" style="display: none;">
-                            <span class="timer-label">Focus:</span>
-                            <span id="header-timer-text">00:00:00</span>
-                        </div>
-                        <span id="user-display-name">Loading...</span>
-                        <button id="logout-btn">Logout</button>
+<div id="main-app" class="page" style="display: none;">
+         <div class="dashboard-container">
+            <header>
+                <div class="logo">S<span class="accent">Genius</span></div>
+                <nav>
+                    <a href="#dashboard" class="nav-link active">Dashboard</a>
+                    <a href="#classrooms" class="nav-link">Classrooms</a>
+                    <!-- NEW LINKS ADDED -->
+                    <a href="#quiz" class="nav-link">AI Quiz</a>
+                    <a href="#review" class="nav-link">Review</a>
+                    <!-- END OF NEW LINKS -->
+                    <a href="#logbook" class="nav-link">Logbook</a>
+                    <a href="#leaderboard" class="nav-link">Leaderboard</a>
+                    <a href="#profile" class="nav-link">Profile</a>
+                </nav>
+                <div class="user-info">
+                    <div id="persistent-timer-display" style="display: none;">
+                        <span class="timer-label">Focus:</span>
+                        <span id="header-timer-text">00:00:00</span>
                     </div>
-                </header>
-                <main id="main-content"></main>
-            </div>
+                    <span id="user-display-name">Loading...</span>
+                    <button id="logout-btn">Logout</button>
+                </div>
+            </header>
+            <main id="main-content"></main>
         </div>
     </div>
     

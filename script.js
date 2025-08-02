@@ -18,16 +18,20 @@ import {
     getDocs,
     updateDoc,
     serverTimestamp,
-    orderBy,
     Timestamp,
-    writeBatch
+    writeBatch,
+    orderBy // Make sure orderBy is imported for the logbook query
 } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
 
 
-// --- IMPORTANT: CONFIGURE THESE ---
-const FLASK_BACKEND_URL = "https://sgenius-ai-quiz-generator.onrender.com"; // Your deployed backend URL
+// --- START OF CORRECTION ---
+// The backend is split into two services on Render.
+// One handles plain-text responses (chat, hints), and the other handles JSON (quiz).
+// These URLs correspond to the services you will create in the guide.
+const PLAIN_TEXT_BACKEND_URL = "https://sgenius-chatbot.onrender.com"; // For chat, feedback, hints
+const JSON_BACKEND_URL = "https://sgenius-ai-quiz-generator.onrender.com"; // For AI Quiz Generator
 const IMGBB_API_KEY = "8c3ac5bab399ca801e354b900052510d"; // Your ImgBB API Key
-// ------------------------------------
+// --- END OF CORRECTION ---
 
 
 // --- Global State ---
@@ -370,7 +374,7 @@ function renderQuizPage() {
                         <option value="other">Other...</option>
                     </select>
                 </div>
-                <div class="input-group" id="other-subject-group">
+                <div class="input-group" id="other-subject-group" style="display:none;">
                     <label for="quiz-other-subject">Custom Subject</label>
                     <input type="text" id="quiz-other-subject" placeholder="e.g., World History">
                 </div>
@@ -416,7 +420,7 @@ async function handleQuizGeneration(e) {
     }
     
     try {
-        const response = await fetch(`${FLASK_BACKEND_URL}/api/generate-quiz`, {
+        const response = await fetch(`${JSON_BACKEND_URL}/api/generate-quiz`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ subject, topics, num_questions: parseInt(num_questions) })
@@ -424,16 +428,20 @@ async function handleQuizGeneration(e) {
 
         if (!response.ok) {
             const err = await response.json();
-            throw new Error(err.error || 'Failed to generate quiz.');
+            throw new Error(err.error || `Server responded with status: ${response.status}`);
         }
 
         const data = await response.json();
+        if (!data.questions) {
+            throw new Error("Received an invalid response from the server.");
+        }
         currentQuizData = data.questions;
         displayQuiz(currentQuizData);
 
     } catch (error) {
         console.error("Quiz Generation Error:", error);
         alert(`Error: ${error.message}`);
+    } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Generate Quiz';
     }
@@ -570,7 +578,10 @@ async function handleSaveReviewQuestions() {
     try {
         await batch.commit();
         alert(`${reviewCheckboxes.length} question(s) saved for review!`);
-        reviewCheckboxes.forEach(box => box.disabled = true);
+        reviewCheckboxes.forEach(box => {
+            box.disabled = true;
+            box.closest('.question-block').querySelector('.review-checkbox').title = "Saved!";
+        });
         document.getElementById('save-review-btn').disabled = true;
     } catch (error) {
         console.error("Error saving review questions:", error);
@@ -648,20 +659,24 @@ async function handleAiChatSubmit(e) {
     addMessageToChat('SGenius is thinking...', 'ai', 'loading');
 
     try {
-        const response = await fetch(`${FLASK_BACKEND_URL}/chat`, {
+        const response = await fetch(`${PLAIN_TEXT_BACKEND_URL}/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: userMessage })
         });
-        if (!response.ok) throw new Error(`Server responded with status: ${response.status}`);
+        
         const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || `Server responded with status: ${response.status}`);
+        }
+        
         const aiMessage = data.response;
         chatWindow.querySelector('.loading')?.remove();
         addMessageToChat(aiMessage, 'ai');
     } catch (error) {
         console.error('AI Chat Error:', error);
         chatWindow.querySelector('.loading')?.remove();
-        addMessageToChat('Sorry, I encountered an error. Please try again later.', 'ai');
+        addMessageToChat(`Sorry, I encountered an error: ${error.message}`, 'ai');
     }
 }
 function addMessageToChat(text, ...types) {
@@ -1284,19 +1299,23 @@ async function handleGetHint(assignment) {
     hintBox.textContent = 'SGenius is thinking...';
 
     try {
-        const response = await fetch(`${FLASK_BACKEND_URL}/api/hint`, {
+        const response = await fetch(`${PLAIN_TEXT_BACKEND_URL}/api/hint`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ subject: assignment.subject, title: assignment.title })
         });
-        if (!response.ok) throw new Error('Failed to get hint from server.');
-
+        
         const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to get hint from server.');
+        }
+
         hintBox.textContent = data.hint;
 
     } catch(error) {
         console.error("Error getting hint:", error);
-        hintBox.textContent = "Sorry, couldn't get a hint right now. Please try again later.";
+        hintBox.textContent = `Sorry, couldn't get a hint right now. Error: ${error.message}`;
+    } finally {
         hintBtn.disabled = false;
         hintBtn.textContent = 'Stuck? Ask SGenius for a Hint';
     }
@@ -1423,7 +1442,7 @@ async function handleGrading(e, assignment) {
     gradeButton.textContent = "Generating...";
 
     try {
-        const feedbackResponse = await fetch(`${FLASK_BACKEND_URL}/api/feedback`, {
+        const feedbackResponse = await fetch(`${PLAIN_TEXT_BACKEND_URL}/api/feedback`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -1432,8 +1451,12 @@ async function handleGrading(e, assignment) {
                 title: assignment.title
             })
         });
-        if (!feedbackResponse.ok) throw new Error("AI feedback server error.");
+        
         const feedbackData = await feedbackResponse.json();
+        if (!feedbackResponse.ok) {
+            throw new Error(feedbackData.error || "AI feedback server error.");
+        }
+        
         const feedbackText = feedbackData.feedback;
 
         const submissionRef = doc(db, `classrooms/${assignment.classId}/assignments/${assignment.id}/submissions`, studentId);
@@ -1449,7 +1472,7 @@ async function handleGrading(e, assignment) {
 
     } catch(error) {
         console.error("Error during grading:", error);
-        alert("An error occurred. Could not save grade.");
+        alert(`An error occurred: ${error.message}`);
         gradeButton.disabled = false;
         gradeButton.textContent = "Generate Feedback & Save";
     }
@@ -1457,7 +1480,7 @@ async function handleGrading(e, assignment) {
 
 // --- Utilities ---
 async function uploadImageToImgBB(imageFile) {
-    if (!IMGBB_API_KEY || IMGBB_API_KEY.includes("PASTE YOUR")) {
+    if (!IMGBB_API_KEY || IMGBB_API_KEY.includes("YOUR")) {
         alert("Image upload is not configured. Please add an ImgBB API key in script.js.");
         return null;
     }

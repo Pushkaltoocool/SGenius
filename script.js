@@ -1,3 +1,5 @@
+// --- START OF FILE script.js ---
+
 // --- Firebase & Backend Configuration ---
 const { auth, db } = window.firebase;
 import {
@@ -763,12 +765,30 @@ async function finishAndLogSession() {
 
     if (currentUser && durationInSeconds > 0) {
         try {
-            const logCollectionRef = collection(db, `users/${currentUser.uid}/logs`);
-            await addDoc(logCollectionRef, {
+            // --- START OF CORRECTION ---
+            // Use a batched write to update the private log and the public leaderboard data atomically.
+            const batch = writeBatch(db);
+
+            // 1. Reference to the user's private log document
+            const privateLogRef = doc(collection(db, `users/${currentUser.uid}/logs`));
+            batch.set(privateLogRef, {
                 timestamp: serverTimestamp(),
                 duration: durationInSeconds,
                 subject: subject
             });
+
+            // 2. Reference to the new public log document for the leaderboard
+            const publicLogRef = doc(collection(db, 'publicLogs'));
+            batch.set(publicLogRef, {
+                userId: currentUser.uid,
+                displayName: currentUserProfile.displayName,
+                duration: durationInSeconds,
+                timestamp: serverTimestamp()
+            });
+
+            await batch.commit();
+            // --- END OF CORRECTION ---
+            
             alert(`Session of ${formatDuration(durationInSeconds)} for ${subject} saved to your logbook!`);
         } catch(error) {
             console.error("Error saving log:", error);
@@ -777,6 +797,7 @@ async function finishAndLogSession() {
     }
     resetStopwatch();
 }
+
 
 // --- Logbook & Leaderboard ---
 async function renderLogbook() {
@@ -846,6 +867,11 @@ async function renderLeaderboard() {
 
     displayLeaderboard('daily');
 }
+
+// --- START OF CORRECTION ---
+// This insecure function is removed. It attempted to read all user documents
+// and their private subcollections, which is blocked by security rules.
+/*
 async function fetchAllUserLogs() {
     const usersSnapshot = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
     const allLogs = [];
@@ -862,12 +888,17 @@ async function fetchAllUserLogs() {
     }
     return allLogs;
 }
+*/
+// --- END OF CORRECTION ---
+
 async function displayLeaderboard(period) {
     const contentDiv = document.getElementById('leaderboard-content');
     contentDiv.innerHTML = 'Calculating ranks...';
     
     try {
-        const allLogs = await fetchAllUserLogs();
+        // --- START OF CORRECTION ---
+        // The logic is now rewritten to securely query the `publicLogs` collection
+        // and aggregate the data on the client side.
         const now = new Date();
         let startDate;
 
@@ -877,21 +908,27 @@ async function displayLeaderboard(period) {
             const firstDayOfWeek = now.getDate() - now.getDay();
             startDate = new Date(now.setDate(firstDayOfWeek));
             startDate.setHours(0, 0, 0, 0);
-        } else {
+        } else { // monthly
             startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         }
         
-        const periodLogs = allLogs.filter(log => log.timestamp && log.timestamp.toDate() >= startDate);
+        // 1. Securely query the publicLogs collection for the given time period.
+        const q = query(collection(db, "publicLogs"), where("timestamp", ">=", startDate));
+        const logsSnapshot = await getDocs(q);
+        const periodLogs = logsSnapshot.docs.map(doc => doc.data());
 
+        // 2. Aggregate the logs by user on the client.
         const userTotals = periodLogs.reduce((acc, log) => {
             acc[log.userId] = acc[log.userId] || { total: 0, displayName: log.displayName };
             acc[log.userId].total += log.duration;
             return acc;
         }, {});
 
+        // 3. Sort the aggregated data to create the ranking.
         const sortedUsers = Object.entries(userTotals)
             .map(([userId, data]) => ({ userId, total: data.total, displayName: data.displayName }))
             .sort((a, b) => b.total - a.total);
+        // --- END OF CORRECTION ---
 
         if (sortedUsers.length === 0) {
             contentDiv.innerHTML = '<p>No study sessions logged for this period yet.</p>';
